@@ -6,7 +6,7 @@ Research runtime accompanying **SecureClaw: Clawing Back Control of LLM Agents**
 
 SecureClaw moves sensitive data access and action authorization into a mediated runtime. This reference implementation includes opaque handles, declassification, two policy servers, PREVIEW–COMMIT authorization, executor-side verification of both policy-server MACs, replay protection, and capsule mediation examples.
 
-This repository provides a runtime reference, synthetic demonstrations, and local mechanism validation. The paper's benchmark datasets, complete evaluation harness, model trajectories, and raw rebuttal results are not included. The local checks below validate implementation behavior; they do not regenerate the paper's aggregate results. In particular, the included declassification demonstration is not the schema-aware summary operator used in the benchmark experiments. See [the paper-to-code map](docs/paper_to_code.md) for the precise scope.
+This repository includes the core runtime and the method adapters for schema-aware summaries, field classification, and channel mediation, together with synthetic demonstrations and local tests. Experiment results, raw model trajectories, datasets, and intermediate orchestration scripts are omitted. The local tests check implementation behavior; they do not regenerate the paper's aggregate results. See [the method adapters](method_adapters/README.md) and [the paper-to-code map](docs/paper_to_code.md) for source correspondence and configuration.
 
 ## Quick start
 
@@ -54,6 +54,14 @@ The macOS capsule check was validated with CPython 3.11.4 from an Anaconda insta
 
 These scripts create local test artifacts and a loopback test server. Their platform requirements and scope are described in [capsule/MC_CONTRACT_SPEC.md](capsule/MC_CONTRACT_SPEC.md). Running the ordinary HTTP/MCP demo alone does not establish that every agent side effect is confined by the capsule.
 
+## Method implementation used by benchmark integrations
+
+The [AgentDojo/ASB adapter](method_adapters/agentdojo/README.md) provides the existing `SecureClawToolsExecutor`, including the deterministic summary core, typed aliases, task checks, policy requests, and controlled tool execution. Its optional dependencies and deterministic configuration are documented separately.
+
+The [AgentLeak adapters](method_adapters/agentleak/README.md) provide field classification and masking, protected-value registration, the contextual classifier, and C1/C2/C5 mediation. The contextual classifier is a separate diagnostic component and requires an explicit model request; local tests make no model calls.
+
+These adapters preserve the relevant local method code. Their source and packaging changes are documented; they are not a complete snapshot of every historical experimental environment.
+
 ## MCP and optional agent integrations
 
 Start the local services, then configure your MCP client with [mcp_config.example.json](mcp_config.example.json), replacing the repository path. The MCP server entry point is:
@@ -84,6 +92,7 @@ Existing ablation and insecure-demo switches are retained for research compatibi
 | `capsule/`, `spec/` | OS capsule examples and existing mediation contracts |
 | `secureclaw/`, `common/` | Task capsules, canonical request binding, tokens, and shared utilities |
 | `agent/`, `integrations/` | Built-in synthetic agent and optional client adapters |
+| `method_adapters/` | Source adapters for summaries, classification, and benchmark-facing method integration |
 | `tests/`, `scripts/validate_runtime.py` | Portable tests and local integration validation |
 | `policy_server_rust/` | Optional Rust policy-server implementation; not required by quick start |
 

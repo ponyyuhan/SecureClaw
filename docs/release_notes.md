@@ -41,3 +41,9 @@ The project does not vendor installed Python, Node, or Rust dependencies. Python
 The sensitive-field vocabulary referenced by `common/output_sanitizer.py` follows the [AgentLeak project](https://github.com/Privatris/AgentLeak), specifically its `agentleak/detection/presidio_detector.py` taxonomy. The original comment's local `third_party/` path describes the research workspace; that external benchmark is not bundled here.
 
 The original repository contained no project license. The authors selected the MIT License for the SecureClaw source in this release. This does not change third-party licenses.
+
+## Method-source disclosure update
+
+Added the existing AgentDojo/ASB method executor and AgentLeak field-classification, masking, registration, contextual-classification, and channel-mediation adapters. Extraction retains the relevant original method bodies; integration changes and upstream license notices are documented alongside each adapter. Experiment outputs, model traces, datasets, historical repair scripts, and batch orchestration remain excluded.
+
+The full offline suite passed **55 tests** with Python 3.11 and AgentDojo 0.1.35, including 17 new adapter checks. These checks did not invoke a hosted model or external action. No existing core-runtime mechanism or safety fix was changed in this update. Original release validation above records the earlier runtime/service and capsule checks; those were not rerun for this source-only addition.

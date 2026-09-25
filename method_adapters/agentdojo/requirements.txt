@@ -1,0 +1,3 @@
+# Optional adapter dependencies; install the root requirements first.
+# AgentDojo 0.1.35 is the external API version used in the offline release tests.
+agentdojo==0.1.35
