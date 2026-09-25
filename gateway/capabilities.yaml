@@ -1,0 +1,308 @@
+# Capability projection config for MIRAGE-OG++ demo.
+#
+# Caller identities are untrusted strings provided by the agent runtime, but are still useful
+# as a local policy knob in the trusted gateway (e.g., separate "openclaw" vs "nanoclaw").
+#
+# For a production system you would bind caller to a stronger identity (signed plugin manifest,
+# attestation, per-skill installation identity, etc).
+version: 1
+
+default:
+  allow_intents:
+    - ReadFile
+    - ReadSecret
+    - UseCredential
+    - Declassify
+    - DescribeHandle
+    - RevokeHandle
+    - RevokeSession
+    - ListWorkspaceFiles
+    - ReadWorkspaceFile
+    - WriteWorkspaceFile
+    - CheckMessagePolicy
+    - SendMessage
+    - FetchResource
+    - CheckFetchPolicy
+    - CheckWebhookPolicy
+    - PostWebhook
+    - ImportSkill
+    - DescribeSkill
+    - CheckSkillInstallPolicy
+    - CommitSkillInstall
+    - ListEnabledSkills
+    - SendInterAgentMessage
+    - ReceiveInterAgentMessages
+    - MemoryWrite
+    - MemoryRead
+    - MemoryList
+    - MemoryDelete
+    - RevokeDelegation
+    - FinalizeOutput
+  egress:
+    send_message: true
+    fetch_resource: true
+    post_webhook: true
+    skill_install: false
+
+# External principal projection used for dual-principal checks.
+# Effective privileges are intersection(internal_actor_caps, external_principal_caps).
+principal_default:
+  allow_intents:
+    - ReadFile
+    - ReadSecret
+    - UseCredential
+    - Declassify
+    - DescribeHandle
+    - RevokeHandle
+    - RevokeSession
+    - ListWorkspaceFiles
+    - ReadWorkspaceFile
+    - WriteWorkspaceFile
+    - CheckMessagePolicy
+    - SendMessage
+    - FetchResource
+    - CheckFetchPolicy
+    - CheckWebhookPolicy
+    - PostWebhook
+    - ImportSkill
+    - DescribeSkill
+    - CheckSkillInstallPolicy
+    - CommitSkillInstall
+    - ListEnabledSkills
+    - SendInterAgentMessage
+    - ReceiveInterAgentMessages
+    - MemoryWrite
+    - MemoryRead
+    - MemoryList
+    - MemoryDelete
+    - RevokeDelegation
+    - FinalizeOutput
+  egress:
+    send_message: true
+    fetch_resource: true
+    post_webhook: true
+    skill_install: false
+
+principals:
+  # Example low-trust external tenant profile. Useful in multi-agent federation tests.
+  "ext:partner-low":
+    allow_intents:
+      - CheckMessagePolicy
+      - CheckFetchPolicy
+      - CheckWebhookPolicy
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - FinalizeOutput
+    egress:
+      send_message: false
+      fetch_resource: false
+      post_webhook: false
+      skill_install: false
+
+  # Default internal federation principal with broad permissions; can still be constrained by delegation scopes.
+  "ext:internal-*":
+    allow_intents:
+      - ReadFile
+      - ReadSecret
+      - UseCredential
+      - Declassify
+      - DescribeHandle
+      - RevokeHandle
+      - RevokeSession
+      - ListWorkspaceFiles
+      - ReadWorkspaceFile
+      - WriteWorkspaceFile
+      - CheckMessagePolicy
+      - SendMessage
+      - FetchResource
+      - CheckFetchPolicy
+      - CheckWebhookPolicy
+      - PostWebhook
+      - ImportSkill
+      - DescribeSkill
+      - CheckSkillInstallPolicy
+      - CommitSkillInstall
+      - ListEnabledSkills
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - RevokeDelegation
+      - FinalizeOutput
+    egress:
+      send_message: true
+      fetch_resource: true
+      post_webhook: true
+      skill_install: false
+
+callers:
+  # Per-skill workload identities minted by the executor (workload_token -> caller override).
+  # Default to least privilege: skills can fetch resources and run dry-run policy checks,
+  # but cannot perform side effects directly.
+  "skill:*":
+    allow_intents:
+      - FetchResource
+      - CheckFetchPolicy
+      - CheckWebhookPolicy
+      - CheckMessagePolicy
+      - ReadWorkspaceFile
+      - WriteWorkspaceFile
+      - ListWorkspaceFiles
+      - DescribeHandle
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - FinalizeOutput
+    egress:
+      send_message: false
+      fetch_resource: true
+      post_webhook: false
+      skill_install: false
+
+  # OpenClaw validation uses FetchResource + CheckMessagePolicy; real "SendMessage" can be
+  # blocked in capability to avoid depending on provider side-effect allowances.
+  openclaw:
+    allow_intents:
+      - ReadFile
+      - ReadSecret
+      - UseCredential
+      - Declassify
+      - DescribeHandle
+      - FetchResource
+      - CheckFetchPolicy
+      - CheckMessagePolicy
+      - CheckWebhookPolicy
+      - ImportSkill
+      - DescribeSkill
+      - CheckSkillInstallPolicy
+      - ListEnabledSkills
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - FinalizeOutput
+    egress:
+      send_message: false
+      fetch_resource: true
+      post_webhook: false
+      skill_install: false
+
+  nanoclaw:
+    allow_intents:
+      - ReadFile
+      - ReadSecret
+      - UseCredential
+      - Declassify
+      - DescribeHandle
+      - RevokeHandle
+      - RevokeSession
+      - ListWorkspaceFiles
+      - ReadWorkspaceFile
+      - WriteWorkspaceFile
+      - CheckMessagePolicy
+      - SendMessage
+      - FetchResource
+      - CheckFetchPolicy
+      - PostWebhook
+      - CheckWebhookPolicy
+      - ImportSkill
+      - DescribeSkill
+      - CheckSkillInstallPolicy
+      - CommitSkillInstall
+      - ListEnabledSkills
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - FinalizeOutput
+    egress:
+      send_message: true
+      fetch_resource: true
+      post_webhook: true
+      skill_install: false
+
+  artifact:
+    allow_intents:
+      - ReadFile
+      - ReadSecret
+      - UseCredential
+      - Declassify
+      - DescribeHandle
+      - RevokeHandle
+      - RevokeSession
+      - ListWorkspaceFiles
+      - ReadWorkspaceFile
+      - WriteWorkspaceFile
+      - CheckMessagePolicy
+      - SendMessage
+      - FetchResource
+      - CheckFetchPolicy
+      - PostWebhook
+      - CheckWebhookPolicy
+      - ImportSkill
+      - DescribeSkill
+      - CheckSkillInstallPolicy
+      - CommitSkillInstall
+      - ListEnabledSkills
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - FinalizeOutput
+    egress:
+      send_message: true
+      fetch_resource: true
+      post_webhook: true
+      skill_install: true
+
+  # When the evaluation harness isolates case context, it appends `:{case_id}` to the caller.
+  # Use a prefix wildcard so capability projection remains stable under `AGENTLEAK_ISOLATE_CASE_CONTEXT=1`.
+  "artifact:*":
+    allow_intents:
+      - ReadFile
+      - ReadSecret
+      - UseCredential
+      - Declassify
+      - DescribeHandle
+      - RevokeHandle
+      - RevokeSession
+      - ListWorkspaceFiles
+      - ReadWorkspaceFile
+      - WriteWorkspaceFile
+      - CheckMessagePolicy
+      - SendMessage
+      - FetchResource
+      - CheckFetchPolicy
+      - PostWebhook
+      - CheckWebhookPolicy
+      - ImportSkill
+      - DescribeSkill
+      - CheckSkillInstallPolicy
+      - CommitSkillInstall
+      - ListEnabledSkills
+      - SendInterAgentMessage
+      - ReceiveInterAgentMessages
+      - MemoryWrite
+      - MemoryRead
+      - MemoryList
+      - MemoryDelete
+      - FinalizeOutput
+    egress:
+      send_message: true
+      fetch_resource: true
+      post_webhook: true
+      skill_install: true

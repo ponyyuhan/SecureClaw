@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "SecureClaw Executor Accept Predicate v1",
+  "program_id": "policy_unified_v1",
+  "required_output_keys": ["allow_pre", "need_confirm", "patch0", "patch1"],
+  "commit_tag_share_len_bytes": 16,
+  "mac_ttl_env": "POLICY_MAC_TTL_S",
+  "replay_ttl_env": "EXECUTOR_REPLAY_TTL_S"
+}
+

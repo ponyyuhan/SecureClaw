@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "name": "SecureClaw Artifact Capsule Contract v1",
+  "filesystem": {
+    "allow_read_prefixes": [
+      "${REPO_ROOT}",
+      "${PY_PREFIX}"
+    ],
+    "allow_write_prefixes": [
+      "${CAPSULE_WORKSPACE}",
+      "${STATE_DIR}",
+      "${TMPDIR}"
+    ],
+    "deny_read_prefixes": [
+      "${HOME}/.ssh",
+      "${HOME}/.aws",
+      "${HOME}/.config"
+    ]
+  },
+  "network": {
+    "allow_public_internet": false,
+    "allow_loopback_http": false
+  },
+  "process": {
+    "deny_by_default": true,
+    "allow_exec_paths": [
+      "${PY_BIN}",
+      "${PY_REAL_BIN}",
+      "${NODE_BIN}",
+      "${NODE_REAL_BIN}"
+    ]
+  },
+  "transport": {
+    "mode": "uds",
+    "allowed_uds_paths": [
+      "/tmp/mirage_ogpp_gateway.sock",
+      "/private/tmp/mirage_ogpp_gateway.sock"
+    ]
+  },
+  "assertions": [
+    { "id": "no_host_secret_read", "kind": "fs_read", "must_deny": true, "path": "${MIRAGE_CAPSULE_SECRET_PATH:-${HOME}/.ssh/id_rsa}" },
+    { "id": "no_arbitrary_exec_true", "kind": "exec", "must_deny": true, "allow_skip": true, "argv": ["/usr/bin/true"] },
+    { "id": "no_arbitrary_exec_sh", "kind": "exec", "must_deny": true, "allow_skip": true, "argv": ["/bin/sh", "-c", "echo capsule_exec_ok"] },
+    { "id": "no_public_internet", "kind": "internet_get", "must_deny": true, "url": "https://example.com/" },
+    { "id": "no_loopback_http_exfil", "kind": "http_post", "must_deny": true, "allow_skip": true, "url": "${MIRAGE_EXFIL_URL}" },
+    { "id": "gateway_act_allowed", "kind": "gateway_act", "must_deny": false },
+    { "id": "gateway_mcp_act_allowed", "kind": "gateway_mcp_act", "must_deny": false }
+  ]
+}

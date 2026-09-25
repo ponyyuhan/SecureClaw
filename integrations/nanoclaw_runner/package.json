@@ -1,0 +1,9 @@
+{
+  "name": "mirage-ogpp-nanoclaw-runner",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.2.29"
+  }
+}
+

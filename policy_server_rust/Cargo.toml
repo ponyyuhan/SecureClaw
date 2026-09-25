@@ -1,0 +1,19 @@
+[package]
+name = "mirage_policy_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+base64 = "0.22"
+hyper = "1"
+hyper-util = { version = "0.1", features = ["tokio"] }
+hex = "0.4"
+hmac = "0.12"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+rand = "0.8"
+tower = "0.5"

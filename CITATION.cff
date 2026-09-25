@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "Please cite the SecureClaw paper when referring to this research runtime."
+type: software
+license: MIT
+title: "SecureClaw research runtime"
+authors:
+  - family-names: Ma
+    given-names: Yuhan
+  - family-names: Schmid
+    given-names: Stefan
+repository-code: "https://github.com/ponyyuhan/SecureClaw_repo"
+preferred-citation:
+  type: conference-paper
+  title: "SecureClaw: Clawing Back Control of LLM Agents"
+  authors:
+    - family-names: Ma
+      given-names: Yuhan
+    - family-names: Schmid
+      given-names: Stefan
+  year: 2026
+  conference:
+    name: "Advances in Neural Information Processing Systems"
+  url: "https://openreview.net/forum?id=0omFi3ZiBf"

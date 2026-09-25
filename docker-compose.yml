@@ -1,0 +1,61 @@
+services:
+  policy0:
+    build: .
+    command: ["bash", "-lc", "python -m policy_server.build_dbs && python -m policy_server.server"]
+    environment:
+      SERVER_ID: "0"
+      POLICY_BIND: "0.0.0.0"
+      PORT: "${P0_PORT:-9001}"
+      DATA_DIR: "/app/policy_server/data"
+      FSS_DOMAIN_SIZE: "${FSS_DOMAIN_SIZE:-4096}"
+      POLICY_MAC_KEY: "${POLICY0_MAC_KEY:-1111111111111111111111111111111111111111111111111111111111111111}"
+    ports:
+      - "127.0.0.1:${P0_PORT:-9001}:${P0_PORT:-9001}"
+
+  policy1:
+    build: .
+    command: ["bash", "-lc", "python -m policy_server.build_dbs && python -m policy_server.server"]
+    environment:
+      SERVER_ID: "1"
+      POLICY_BIND: "0.0.0.0"
+      PORT: "${P1_PORT:-9002}"
+      DATA_DIR: "/app/policy_server/data"
+      FSS_DOMAIN_SIZE: "${FSS_DOMAIN_SIZE:-4096}"
+      POLICY_MAC_KEY: "${POLICY1_MAC_KEY:-2222222222222222222222222222222222222222222222222222222222222222}"
+    ports:
+      - "127.0.0.1:${P1_PORT:-9002}:${P1_PORT:-9002}"
+
+  executor:
+    build: .
+    command: ["python", "-m", "executor_server.server"]
+    environment:
+      EXECUTOR_BIND: "0.0.0.0"
+      EXECUTOR_PORT: "${EXECUTOR_PORT:-9100}"
+      POLICY_MAC_TTL_S: "30"
+      POLICY0_MAC_KEY: "${POLICY0_MAC_KEY:-1111111111111111111111111111111111111111111111111111111111111111}"
+      POLICY1_MAC_KEY: "${POLICY1_MAC_KEY:-2222222222222222222222222222222222222222222222222222222222222222}"
+      EXECUTOR_REPLAY_DB_PATH: "/app/.runtime/executor_replay.sqlite3"
+    ports:
+      - "127.0.0.1:${EXECUTOR_PORT:-9100}:${EXECUTOR_PORT:-9100}"
+
+  gateway:
+    build: .
+    command: ["python", "-m", "gateway.http_server"]
+    depends_on:
+      - policy0
+      - policy1
+      - executor
+    environment:
+      POLICY0_URL: "http://policy0:${P0_PORT:-9001}"
+      POLICY1_URL: "http://policy1:${P1_PORT:-9002}"
+      EXECUTOR_URL: "http://executor:${EXECUTOR_PORT:-9100}"
+      FSS_DOMAIN_SIZE: "${FSS_DOMAIN_SIZE:-4096}"
+      MAX_TOKENS_PER_MESSAGE: "${MAX_TOKENS_PER_MESSAGE:-32}"
+      MIRAGE_HTTP_PORT: "${MIRAGE_HTTP_PORT:-8765}"
+      MIRAGE_HTTP_BIND: "0.0.0.0"
+      MIRAGE_HTTP_TOKEN: "${MIRAGE_HTTP_TOKEN:-secureclaw-dev-token}"
+      HANDLE_DB_PATH: "/app/.runtime/handles.sqlite3"
+      LEAKAGE_BUDGET_DB_PATH: "/app/.runtime/leakage_budget.sqlite3"
+      AUDIT_LOG_PATH: "/app/.runtime/audit.jsonl"
+    ports:
+      - "127.0.0.1:${MIRAGE_HTTP_PORT:-8765}:${MIRAGE_HTTP_PORT:-8765}"

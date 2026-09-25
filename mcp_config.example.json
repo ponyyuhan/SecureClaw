@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "secureclaw": {
+      "command": "bash",
+      "args": ["REPLACE_WITH_REPO_ABSOLUTE_PATH/scripts/launch_mcp_gateway.sh"],
+      "env": {
+        "POLICY0_URL": "http://127.0.0.1:9001",
+        "POLICY1_URL": "http://127.0.0.1:9002",
+        "EXECUTOR_URL": "http://127.0.0.1:9100",
+        "FSS_DOMAIN_SIZE": "4096",
+        "MAX_TOKENS_PER_MESSAGE": "32"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+.git
+.venv
+.env
+.env.*
+!.env.example
+.runtime
+artifact_out*
+**/__pycache__
+**/*.pyc
+**/*.log
+**/*.sqlite3*
+**/node_modules
+**/target
+gateway/demo_data/workspace
+policy_server/data
+integrations/openclaw_workspace/.openclaw

@@ -1,0 +1,68 @@
+;; MIRAGE-OG++ "Skill Capsule" (macOS sandbox-exec profile)
+;;
+;; Goal (MVP for paper artifact):
+;; - Untrusted runtime cannot read host secrets (e.g., ~/.ssh/*)
+;; - Untrusted runtime cannot reach the public Internet (local IP only)
+;; - Untrusted runtime can still talk to the trusted MIRAGE gateway (loopback HTTP)
+;;
+;; Use with:
+;;   sandbox-exec -f capsule/capsule.sb \
+;;     -D REPO_ROOT="..." -D CAPSULE_WORKSPACE="..." -D STATE_DIR="..." \
+;;     -D PY_BIN="..." -D PY_PREFIX="..." -D PY_BASE_PREFIX="..." -D TMPDIR="..." \
+;;     <command...>
+;;
+(version 1)
+
+(deny default)
+(import "system.sb")
+
+;; Network: allow only loopback traffic (blocks direct Internet + LAN exfil).
+(system-network)
+(allow system-socket)
+;; For UDS transport we can disable network entirely. If you use HTTP loopback transport,
+;; pass ALLOW_LOOPBACK_NET=1 to allow only localhost traffic.
+(if (string=? (param "ALLOW_LOOPBACK_NET") "1")
+  (allow network-outbound
+    (remote ip "localhost:*")))
+;; Allow connecting to a specific Unix domain socket for netless gateway transport.
+(allow network-outbound
+  (remote unix-socket (path-literal "/tmp/mirage_ogpp_gateway.sock"))
+  (remote unix-socket (path-literal "/private/tmp/mirage_ogpp_gateway.sock")))
+
+;; Process execution: allow only explicitly provided runtimes.
+(allow process-fork)
+(if (positive? (string-length (param "PY_BIN")))
+  (allow process-exec (literal (param "PY_BIN"))))
+(if (positive? (string-length (param "PY_BIN")))
+  (allow process-exec* (literal (param "PY_BIN"))))
+(if (positive? (string-length (param "PY_REAL_BIN")))
+  (allow process-exec (literal (param "PY_REAL_BIN"))))
+(if (positive? (string-length (param "PY_REAL_BIN")))
+  (allow process-exec* (literal (param "PY_REAL_BIN"))))
+(if (positive? (string-length (param "NODE_BIN")))
+  (allow process-exec (literal (param "NODE_BIN"))))
+(if (positive? (string-length (param "NODE_BIN")))
+  (allow process-exec* (literal (param "NODE_BIN"))))
+(if (positive? (string-length (param "NODE_REAL_BIN")))
+  (allow process-exec (literal (param "NODE_REAL_BIN"))))
+(if (positive? (string-length (param "NODE_REAL_BIN")))
+  (allow process-exec* (literal (param "NODE_REAL_BIN"))))
+
+;; File access: allow reading code + deps from the repo, but nothing else in $HOME.
+(if (positive? (string-length (param "REPO_ROOT")))
+  (allow file-read* file-test-existence (subpath (param "REPO_ROOT"))))
+
+;; Python runtime (conda/etc) lives outside /System paths.
+(if (positive? (string-length (param "PY_PREFIX")))
+  (allow file-read* file-test-existence file-map-executable (subpath (param "PY_PREFIX"))))
+;; A venv has a separate base installation containing its interpreter and stdlib.
+(if (positive? (string-length (param "PY_BASE_PREFIX")))
+  (allow file-read* file-test-existence file-map-executable (subpath (param "PY_BASE_PREFIX"))))
+
+;; Workspace/state: allow writes only here.
+(if (positive? (string-length (param "CAPSULE_WORKSPACE")))
+  (allow file-read* file-write* file-test-existence (subpath (param "CAPSULE_WORKSPACE"))))
+(if (positive? (string-length (param "STATE_DIR")))
+  (allow file-read* file-write* file-test-existence (subpath (param "STATE_DIR"))))
+(if (positive? (string-length (param "TMPDIR")))
+  (allow file-read* file-write* file-test-existence (subpath (param "TMPDIR"))))

@@ -1,0 +1,28 @@
+{
+  "id": "mirage_ogpp",
+  "name": "SecureClaw Gateway Bridge",
+  "version": "0.1.0",
+  "description": "Expose a single side-effect tool (secureclaw_act, alias mirage_act) that forwards to the local Python SecureClaw MCP gateway (gateway.mcp_server), or to a remote SecureClaw HTTP gateway via capsule.mcp_proxy.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "python": {
+        "type": "string",
+        "description": "Python executable used to spawn the SecureClaw MCP gateway (default: python)."
+      },
+      "session_id": {
+        "type": "string",
+        "description": "Optional MIRAGE_SESSION_ID to bind sealed handles to this OpenClaw run."
+      },
+      "gateway_http_url": {
+        "type": "string",
+        "description": "Optional MIRAGE_GATEWAY_HTTP_URL. If set, the plugin spawns capsule.mcp_proxy instead of the local gateway.mcp_server."
+      },
+      "http_token": {
+        "type": "string",
+        "description": "Optional MIRAGE_HTTP_TOKEN for the remote HTTP gateway (Authorization: Bearer ...)."
+      }
+    }
+  }
+}

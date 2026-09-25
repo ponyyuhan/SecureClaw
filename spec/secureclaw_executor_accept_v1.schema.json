@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureclaw.local/spec/secureclaw_executor_accept_v1.schema.json",
+  "title": "SecureClaw Executor Commit Evidence Schema v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy0", "policy1"],
+  "properties": {
+    "policy0": { "$ref": "#/$defs/CommitProof0" },
+    "policy1": { "$ref": "#/$defs/CommitProof1" }
+  },
+  "$defs": {
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Base64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "Bit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "Outputs": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/Bit" }
+    },
+    "CommitProofCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "server_id",
+        "kid",
+        "ts",
+        "action_id",
+        "program_id",
+        "request_sha256",
+        "outputs",
+        "commit_tag_share_b64",
+        "mac_b64"
+      ],
+      "properties": {
+        "v": { "type": "integer", "const": 1 },
+        "kind": { "type": "string", "const": "commit" },
+        "server_id": { "type": "integer", "enum": [0, 1] },
+        "kid": { "type": "string", "minLength": 1 },
+        "ts": { "type": "integer" },
+        "action_id": { "type": "string", "minLength": 1 },
+        "program_id": { "type": "string", "minLength": 1 },
+        "request_sha256": { "$ref": "#/$defs/Sha256Hex" },
+        "outputs": { "$ref": "#/$defs/Outputs" },
+        "commit_tag_share_b64": { "$ref": "#/$defs/Base64" },
+        "mac_b64": { "$ref": "#/$defs/Base64" }
+      }
+    },
+    "CommitProof0": {
+      "allOf": [
+        { "$ref": "#/$defs/CommitProofCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": { "type": "integer", "const": 0 }
+          }
+        }
+      ]
+    },
+    "CommitProof1": {
+      "allOf": [
+        { "$ref": "#/$defs/CommitProofCommon" },
+        {
+          "type": "object",
+          "properties": {
+            "server_id": { "type": "integer", "const": 1 }
+          }
+        }
+      ]
+    }
+  }
+}
+

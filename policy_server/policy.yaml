@@ -1,0 +1,86 @@
+# Default policy configuration for the MIRAGE-OG++ demo.
+#
+# You can point build_dbs to a different file via:
+#   POLICY_CONFIG_PATH=/path/to/policy.yaml python -m policy_server.build_dbs
+#
+# Domain size must be a power of two.
+domain_size: 4096
+
+allow_recipients:
+  - alice@example.com
+  - bob@example.com
+
+allow_domains:
+  - example.com
+  - api.github.com
+
+dlp_patterns:
+  - AKIA
+  - xoxb-
+  - OPENSSH PRIVATE KEY
+  - BEGIN PRIVATE KEY
+
+# Skill ingress IOC / install markers (demo).
+# These are used by the Skill Ingress PREVIEW->COMMIT path to block/confirm suspicious skill packages.
+ioc_domains:
+  - socifiapp.com
+  - rentry.co
+  - install.app-distribution.net
+  - 91.92.242.30
+
+install_patterns:
+  - "curl | bash"
+  - "curl|bash"
+  - "wget | sh"
+  - "base64 -d"
+  - "| sh"
+  - "| bash"
+  - "chmod +x"
+  - "powershell"
+  - "Invoke-Expression"
+
+# DFA confirm is built from the same patterns. (Gateway controls whether it is used.)
+dfa_enabled: true
+
+# Build an additional concatenated bitset DB (`policy_bundle.bitset`) that can be used
+# to hide `db_name` from policy servers (gateway knob: USE_POLICY_BUNDLE=1).
+bundle_enabled: true
+
+# --- "Full blueprint" policy programs (DSL -> boolean circuit -> 2PC/MPC) ---
+#
+# The gateway compiles these expressions into an MPC circuit executed by the 2 policy servers
+# (GMW on XOR shares + Beaver triples for AND). The executor verifies dual commit proofs.
+#
+# Expression syntax: bitwise boolean ops over named inputs: `&` (AND), `|` (OR), `^` (XOR), `~` (NOT).
+# Constants: `0` and `1`. Parentheses supported.
+policy_programs:
+  egress_v1:
+    intents:
+      SendMessage:
+        allow_pre: "cap_send & recipient_ok & ~high_handle_present"
+        need_confirm: "dlp_hit"
+        patch0: "dlp_hit"   # patch_id bit0 (1 => REDACT)
+        patch1: "0"         # patch_id bit1
+      FetchResource:
+        allow_pre: "cap_fetch & domain_ok"
+        need_confirm: "0"
+        patch0: "0"
+        patch1: "0"
+      PostWebhook:
+        allow_pre: "cap_webhook & domain_ok & ~high_handle_present"
+        need_confirm: "dlp_hit"
+        patch0: "dlp_hit"
+        patch1: "0"
+
+  # Skill ingress "install/enable" policy.
+  # Inputs:
+  # - cap_skill_install: caller capability bit
+  # - ioc_hit: 1 if the skill references known-bad domains/IPs (IOC membership via PIR)
+  # - install_hit: 1 if install semantics look like download-and-execute (PIR token hits)
+  # - base64_obf: 1 if text contains suspicious base64-like payload blocks (local feature)
+  skill_ingress_v1:
+    outputs:
+      allow_pre: "cap_skill_install & ~ioc_hit"
+      need_confirm: "install_hit | base64_obf"
+      patch0: "install_hit | base64_obf"   # patch_id bit0 (1 => REDACT)
+      patch1: "0"

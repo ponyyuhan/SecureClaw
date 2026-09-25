@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mirage.act",
+  "type": "object",
+  "required": [
+    "intent_id",
+    "inputs",
+    "constraints",
+    "caller"
+  ],
+  "properties": {
+    "intent_id": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "constraints": {
+      "type": "object"
+    },
+    "caller": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
