@@ -5,7 +5,7 @@ on 2026-09-25. The paths below identify the research source; line numbers refer
 to that source at extraction time. No benchmark implementation is vendored.
 The extracted authors' code is covered by this repository's MIT license.
 
-Function bodies and constants are unchanged, with the following integration changes:
+The extraction retained the original method bodies. Integration and subsequent correctness changes are listed below:
 
 - Imports are restricted to the dependencies of the selected definitions and
   local relative imports.
@@ -17,6 +17,11 @@ Function bodies and constants are unchanged, with the following integration chan
   excluded.
 - The contextual classifier's `OpenAI` import is deferred to `ModelPool.__init__`;
   its prompt, request construction, parsing, and validation remain unchanged.
+- A subsequent registration correction keeps whole structured values and also
+  registers their scalar leaves under the same parent field. Actual numeric
+  values additionally receive a thousands-separated alias, without rounding or
+  reinterpreting string identifiers. This covers list items rendered as prose and
+  amounts rendered with commas; sanitizer matching and policy rules are unchanged.
 
 This is a disclosure of method source. It is not a claim that the current working
 copy is byte-identical to every historical experiment. It does not include model

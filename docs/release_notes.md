@@ -55,3 +55,7 @@ The release now also includes the original primary benchmark runners and scorers
 The complete offline suite still passes 55 tests. CLI/import and inventory checks cover the AgentDojo 97 benign/629 attacked cases, ASB 2,000 cases, and AgentLeak 500 benign/496 attacked cases. Small hosted-model checks exercise the disclosed runner paths; they are not a repeat of all paper experiments. Their generated outputs remain local, as do all historical experiment results and traces.
 
 The accommodation runner's existing protocol-document dependency is supplied at `rebuttal/EXPERIMENT_PROTOCOL.md`. This is a public protocol description for the disclosed source; the original private development plan and review correspondence are not bundled. Core runtime enforcement and existing tests are unchanged by these packaging additions.
+
+## Implementation verification repairs
+
+Expanded own-method checks identified and repaired per-read reference collisions, overwritten task records, incomplete sensitive-value registration, missing attack delivery in the topology adapter, and incomplete channel observation during ablations. Evaluation errors are reported separately from scored outcomes, field-diagnostic selection works without historical result files, and the confirmation test now exercises a genuinely confirmation-required action. Existing authorization, replay, confinement and confirmation protections remain enabled. See [implementation checks](../experiments/implementation_checks.md) for entry points and scope. No upstream benchmark data or scoring rule was changed.

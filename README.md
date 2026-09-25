@@ -32,6 +32,8 @@ The demo maps sensitive-looking file paths to explicit fake fixtures under `gate
 
 ## Validation
 
+See [implementation checks](experiments/implementation_checks.md) for the repaired mechanisms and the distinction between channel-mediation and protected-read experiments.
+
 Run the portable mechanism tests without starting services:
 
 ```bash

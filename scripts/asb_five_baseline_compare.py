@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import json
 import logging
@@ -218,6 +219,7 @@ def _ensure_csv(path: Path) -> None:
                 "Memory Found",
                 "Aggressive",
                 "messages",
+                "Execution Error",
             ]
         )
 
@@ -228,8 +230,11 @@ def _append_csv_row(
     scenario: Scenario,
     messages: list[dict[str, Any]],
     memory_found: bool | None = None,
+    execution_error: str = "",
 ) -> None:
     _ensure_csv(path)
+    with path.open("r", encoding="utf-8", newline="") as header_fh:
+        has_error_column = "Execution Error" in next(csv.reader(header_fh))
     with path.open("a", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerow(
@@ -242,45 +247,86 @@ def _append_csv_row(
                 "N/A" if memory_found is None else (1 if memory_found else 0),
                 1 if scenario.attack_tool.aggressive else 0,
                 json.dumps(messages, ensure_ascii=False),
-            ]
+            ] + ([execution_error] if has_error_column else [])
         )
+
+
+def _csv_execution_error(row: dict[str, Any]) -> str:
+    if row.get("Execution Error") is not None:
+        return str(row["Execution Error"]).strip()
+    # Older upstream CSVs do not have an error column. Recognize their saved
+    # provider/runner failure messages; all other legacy status stays unknown.
+    raw = str(row.get("messages") or "")
+    try:
+        messages = json.loads(raw)
+    except (ValueError, TypeError):
+        try:
+            messages = ast.literal_eval(raw)
+        except (ValueError, SyntaxError):
+            return ""
+    if not isinstance(messages, list):
+        return ""
+    prefixes = ("ERROR:", "Server connection error:", "OpenAI STATUS error",
+                "OpenAI RATE LIMIT error", "OpenAI BAD REQUEST error",
+                "An unexpected error occurred:")
+    for message in messages:
+        if isinstance(message, dict):
+            for field in ("content", "thinking"):
+                value = message.get(field)
+                if isinstance(value, str) and value.strip().startswith(prefixes):
+                    return value.strip()
+    return ""
+
+
+def _run_case_and_record(path: Path, scenario: Scenario, model: str, runner: Callable) -> None:
+    execution_error = ""
+    try:
+        messages, _ = runner(scenario, model)
+    except Exception as exc:  # noqa: BLE001
+        execution_error = f"{type(exc).__name__}: {exc}"
+        messages = [{"role": "assistant", "content": f"ERROR: {execution_error}", "tool_calls": []}]
+    _append_csv_row(path, scenario=scenario, messages=messages, execution_error=execution_error)
 
 
 def _summarize_csv(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"status": "missing", "path": str(path), "rows": 0}
-    rows: list[dict[str, str]] = []
     with path.open("r", encoding="utf-8", errors="replace") as fh:
-        rows.extend(csv.DictReader(fh))
-    n = len(rows)
-    if n == 0:
+        rows = list(csv.DictReader(fh))
+    if not rows:
         return {"status": "empty", "path": str(path), "rows": 0}
-    attack = sum(int(str(r.get("Attack Successful") or "0")) for r in rows)
-    utility = sum(int(str(r.get("Original Task Successful") or "0")) for r in rows)
-    refuse = sum(int(str(r.get("Refuse Result") or "0")) for r in rows)
-    memory_found_values = [_parse_binary_cell(r.get("Memory Found")) for r in rows]
+    scored = [row for row in rows if not _csv_execution_error(row)]
+    n = len(scored)
+    error_count = len(rows) - n
+    attack = sum(int(str(r.get("Attack Successful") or "0")) for r in scored)
+    utility = sum(int(str(r.get("Original Task Successful") or "0")) for r in scored)
+    refuse = sum(int(str(r.get("Refuse Result") or "0")) for r in scored)
+    memory_found_values = [_parse_binary_cell(r.get("Memory Found")) for r in scored]
     memory_found_known = [value for value in memory_found_values if value is not None]
     memory_found = sum(memory_found_known)
     pna = n - attack
     return {
-        "status": "ok",
+        "status": "incomplete" if error_count else "ok",
         "path": str(path),
-        "rows": n,
+        "rows": len(rows),
+        "scored_rows": n,
+        "execution_error_count": error_count,
+        "error_status_unknown_rows": sum(r.get("Execution Error") is None for r in rows),
         "attack_success_count": attack,
-        "attack_success_rate": attack / n,
+        "attack_success_rate": _pct_rate(attack, n),
         "utility_success_count": utility,
-        "utility_success_rate": utility / n,
+        "utility_success_rate": _pct_rate(utility, n),
         "original_task_success_count": utility,
-        "original_task_success_rate": utility / n,
+        "original_task_success_rate": _pct_rate(utility, n),
         "refuse_count": refuse,
-        "refuse_rate": refuse / n,
+        "refuse_rate": _pct_rate(refuse, n),
         "rr_count": refuse,
-        "rr_rate": refuse / n,
+        "rr_rate": _pct_rate(refuse, n),
         "memory_found_count": memory_found,
         "memory_found_rows": len(memory_found_known),
         "memory_found_rate": _pct_rate(memory_found, len(memory_found_known)),
         "pna_count": pna,
-        "pna_rate": pna / n,
+        "pna_rate": _pct_rate(pna, n),
     }
 
 
@@ -1197,6 +1243,9 @@ def _report_payload(*, args: argparse.Namespace, run_root: Path) -> dict[str, An
         base_dir = run_root / baseline
         per_attack: dict[str, Any] = {}
         total_rows = 0
+        total_scored = 0
+        total_errors = 0
+        total_unknown = 0
         total_attack = 0
         total_utility = 0
         total_refuse = 0
@@ -1205,31 +1254,39 @@ def _report_payload(*, args: argparse.Namespace, run_root: Path) -> dict[str, An
         for attack_type in args.attack_types:
             summary = _summarize_csv(base_dir / f"{attack_type}.csv")
             per_attack[attack_type] = summary
-            if summary.get("status") == "ok":
+            if summary.get("status") != "ok":
+                report["status"] = "INCOMPLETE"
+            if summary.get("rows", 0):
                 total_rows += int(summary.get("rows", 0))
+                total_scored += int(summary.get("scored_rows", 0))
+                total_errors += int(summary.get("execution_error_count", 0))
+                total_unknown += int(summary.get("error_status_unknown_rows", 0))
                 total_attack += int(summary.get("attack_success_count", 0))
                 total_utility += int(summary.get("utility_success_count", 0))
                 total_refuse += int(summary.get("refuse_count", 0))
                 total_memory_found += int(summary.get("memory_found_count", 0))
                 total_memory_found_rows += int(summary.get("memory_found_rows", 0))
-        total_pna = total_rows - total_attack
+        total_pna = total_scored - total_attack
         overall = {
             "rows": total_rows,
+            "scored_rows": total_scored,
+            "execution_error_count": total_errors,
+            "error_status_unknown_rows": total_unknown,
             "attack_success_count": total_attack,
-            "attack_success_rate": (total_attack / total_rows) if total_rows else 0.0,
+            "attack_success_rate": _pct_rate(total_attack, total_scored),
             "utility_success_count": total_utility,
-            "utility_success_rate": (total_utility / total_rows) if total_rows else 0.0,
+            "utility_success_rate": _pct_rate(total_utility, total_scored),
             "original_task_success_count": total_utility,
-            "original_task_success_rate": (total_utility / total_rows) if total_rows else 0.0,
+            "original_task_success_rate": _pct_rate(total_utility, total_scored),
             "refuse_count": total_refuse,
-            "refuse_rate": (total_refuse / total_rows) if total_rows else 0.0,
+            "refuse_rate": _pct_rate(total_refuse, total_scored),
             "rr_count": total_refuse,
-            "rr_rate": (total_refuse / total_rows) if total_rows else 0.0,
+            "rr_rate": _pct_rate(total_refuse, total_scored),
             "memory_found_count": total_memory_found,
             "memory_found_rows": total_memory_found_rows,
             "memory_found_rate": _pct_rate(total_memory_found, total_memory_found_rows),
             "pna_count": total_pna,
-            "pna_rate": (total_pna / total_rows) if total_rows else 0.0,
+            "pna_rate": _pct_rate(total_pna, total_scored),
         }
         report["baselines"][baseline] = {"per_attack_type": per_attack, "overall": overall}
     return report
@@ -1263,8 +1320,8 @@ def _write_report(run_root: Path, report: dict[str, Any]) -> None:
         lines.append("")
     lines.extend(
         [
-            f"| Baseline | Rows | {metric_header} |",
-            f"| --- | ---: | {metric_sep} |",
+            f"| Baseline | Rows | Scored | Errors | {metric_header} |",
+            f"| --- | ---: | ---: | ---: | {metric_sep} |",
         ]
     )
     baselines = report.get("baselines") if isinstance(report.get("baselines"), dict) else {}
@@ -1274,19 +1331,19 @@ def _write_report(run_root: Path, report: dict[str, Any]) -> None:
         entry = baselines.get(baseline) if isinstance(baselines.get(baseline), dict) else {}
         overall = entry.get("overall") if isinstance(entry.get("overall"), dict) else {}
         metric_cells = " | ".join(_metric_value_str(overall, key) for key, _ in metric_columns)
-        lines.append(f"| {baseline} | {int(overall.get('rows', 0))} | {metric_cells} |")
+        lines.append(f"| {baseline} | {int(overall.get('rows', 0))} | {int(overall.get('scored_rows', 0))} | {int(overall.get('execution_error_count', 0))} | {metric_cells} |")
     lines.append("")
     for baseline in baseline_order:
         entry = baselines.get(baseline) if isinstance(baselines.get(baseline), dict) else {}
         per_attack = entry.get("per_attack_type") if isinstance(entry.get("per_attack_type"), dict) else {}
         lines.append(f"## {baseline}")
         lines.append("")
-        lines.append(f"| Attack Type | Rows | {metric_header} |")
-        lines.append(f"| --- | ---: | {metric_sep} |")
+        lines.append(f"| Attack Type | Rows | Scored | Errors | {metric_header} |")
+        lines.append(f"| --- | ---: | ---: | ---: | {metric_sep} |")
         for attack_type in attack_types:
             summary = per_attack.get(attack_type) if isinstance(per_attack.get(attack_type), dict) else {}
             metric_cells = " | ".join(_metric_value_str(summary, key) for key, _ in metric_columns)
-            lines.append(f"| {attack_type} | {int(summary.get('rows', 0))} | {metric_cells} |")
+            lines.append(f"| {attack_type} | {int(summary.get('rows', 0))} | {int(summary.get('scored_rows', 0))} | {int(summary.get('execution_error_count', 0))} | {metric_cells} |")
         lines.append("")
     (run_root / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1441,17 +1498,7 @@ def main() -> None:
                         state[baseline][attack_type]["attack_success_count"] = int(summary.get("attack_success_count", 0))
                         state[baseline][attack_type]["utility_success_count"] = int(summary.get("utility_success_count", 0))
                         continue
-                    try:
-                        messages, _ = baseline_runners[baseline](scenario, str(args.model))
-                    except Exception as exc:  # noqa: BLE001
-                        messages = [
-                            {
-                                "role": "assistant",
-                                "content": f"ERROR: {type(exc).__name__}: {exc}",
-                                "tool_calls": [],
-                            }
-                        ]
-                    _append_csv_row(csv_path, scenario=scenario, messages=messages)
+                    _run_case_and_record(csv_path, scenario, str(args.model), baseline_runners[baseline])
                     existing_pairs.add(key)
                     summary = _summarize_csv(csv_path)
                     state[baseline][attack_type]["rows_done"] = int(summary.get("rows", 0))
@@ -1461,8 +1508,10 @@ def main() -> None:
 
     if emit_top_level:
         report = _report_payload(args=args, run_root=run_root)
+        if any(cell["rows_done"] < cell["rows_total"] for group in state.values() for cell in group.values()):
+            report["status"] = "INCOMPLETE"
         _write_report(run_root, report)
-        _flush_status(status="OK")
+        _flush_status(status=report["status"])
 
 
 if __name__ == "__main__":

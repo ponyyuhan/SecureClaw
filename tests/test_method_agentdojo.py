@@ -75,13 +75,33 @@ class AgentDojoMethodTests(unittest.TestCase):
         self.assertEqual(summary["_truncated_items"], 3)
         self.assertEqual(len(summary), 9)  # Eight retained fields plus count.
 
-    def test_alias_registry_is_reset_at_each_read(self):
-        first = json.loads(self.executor._read_result_payload({"sender": "alice@example.com"}))
-        second = json.loads(self.executor._read_result_payload({"sender": "bob@example.com"}))
-        self.assertEqual(first["summary"]["sender"], "EMAIL_REF_1")
-        self.assertEqual(second["summary"]["sender"], "EMAIL_REF_1")
-        self.assertNotIn("alice@example.com", self.executor._real_to_alias)
-        self.assertEqual(self.executor._alias_to_real["EMAIL_REF_1"], "bob@example.com")
+    def test_earlier_payment_reference_keeps_its_binding_after_another_read(self):
+        vendor = "GB29NWBK60161331926819"
+        own_account = "DE89370400440532013000"
+        first = json.loads(self.executor._read_result_payload({"iban": vendor}))
+        second = json.loads(self.executor._read_result_payload({"iban": own_account}))
+        vendor_ref, own_ref = first["summary"]["iban"], second["summary"]["iban"]
+        self.assertNotEqual(vendor_ref, own_ref)
+        self.assertEqual(self.executor._resolve_aliases({"recipient": vendor_ref}), {"recipient": vendor})
+        self.assertEqual(self.executor._resolve_aliases({"recipient": own_ref}), {"recipient": own_account})
+        self.assertNotIn(vendor, self.executor._real_to_alias)
+
+    def test_current_read_alias_counter_is_independent_of_previous_secret_count(self):
+        other = SecureClawToolsExecutor()
+        self.executor._read_result_payload({"sender": "alice@example.com"})
+        other._read_result_payload({"senders": ["bob@example.com", "carol@example.com", "dan@example.com"]})
+        first = json.loads(self.executor._read_result_payload({"sender": "target@example.com"}))
+        second = json.loads(other._read_result_payload({"sender": "target@example.com"}))
+        self.assertEqual(first["summary"]["sender"], second["summary"]["sender"])
+        self.assertEqual(first["summary"]["sender"], "EMAIL_REF_1_R2")
+
+    def test_reference_bindings_are_cleared_for_a_new_task(self):
+        self.executor._ensure_turn("task one", [], {"secureclaw_turn_id": "one"})
+        self.executor._read_result_payload({"sender": "alice@example.com"})
+        self.executor._ensure_turn("task two", [], {"secureclaw_turn_id": "two"})
+        self.assertEqual(self.executor._alias_to_real, {})
+        self.assertEqual(self.executor._real_to_alias, {})
+        self.assertEqual(self.executor._alias_read_index, 0)
 
     def test_obfuscated_identifiers_are_canonicalized_before_aliasing(self):
         summary = json.loads(self.executor._read_result_payload({

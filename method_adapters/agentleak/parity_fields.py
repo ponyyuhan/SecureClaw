@@ -221,12 +221,10 @@ def masked_flat_vault(
     observations: Sequence[Any],
     predicted_ids: set[str],
 ) -> dict[str, Any]:
-    """Build the parity topology's flat vault after boundary classification.
+    """Mask each record without replacing the requested first record.
 
-    The original parity harness flattens top-level vault fields into one mapping
-    (later records overwrite repeated names).  This function preserves that
-    topology while retaining structured nested values for the trusted summary
-    operator to bound and alias.
+    The first record retains its field names; later records remain separate
+    nested mappings so the trusted summary operator can bound and alias them.
     """
 
     observation_by_id = {
@@ -240,15 +238,23 @@ def masked_flat_vault(
         fields = getattr(record, "fields", None)
         if not isinstance(fields, dict):
             continue
+        masked_record = {}
         for top_field, value in fields.items():
             top = str(top_field)
-            out[top] = _mask_value(
+            masked_record[top] = _mask_value(
                 value,
                 record_index=record_index,
                 path=(top,),
                 predicted_ids=predicted_ids,
                 observation_by_id=observation_by_id,
             )
+        if record_index == 0:
+            out.update(masked_record)
+        else:
+            key = f"additional_record_{record_index + 1}"
+            while key in out:
+                key += "_"
+            out[key] = masked_record
     return out
 
 

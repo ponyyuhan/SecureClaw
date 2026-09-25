@@ -9,13 +9,21 @@ trajectories, model credentials, or experiment orchestration.
 
 The adapter is extracted from the research workspace's modified
 `third_party/ipiguard/agentdojo/src/agentdojo/agent_pipeline/tool_execution.py`.
-The two retained classes and two helper functions have unchanged bodies:
+The two retained classes and two helper functions are:
 `ToolsExecutor`, `SecureClawToolsExecutor`, `tool_result_to_str`, and
 `_policy_deny_tool_message`. Packaging changes select the required imports,
 resolve the configuration directory relative to this release, and import the
 included tool whitelist. Unrelated executor implementations and the original
 benchmark pipeline are omitted. See [NOTICE.md](NOTICE.md) for upstream credits
 and licenses.
+
+The release fixes one cross-read alias issue found during validation: a later
+read must not reuse an earlier reference for a different value. Each read keeps
+its own local alias counter and uses a public read ordinal as a namespace;
+earlier references remain resolvable until the task ends. This retains the
+per-read counter reset used to avoid revealing earlier secret counts.
+Regression tests cover the earlier reference's binding, independence from
+earlier secret counts, and clearing the bindings at the next task.
 
 ## Install and check locally
 
@@ -81,8 +89,9 @@ reference aliases inside the adapter before invoking tools.
   metadata and may contain bounded planning fields, form schemas, and guidance.
 - Identifiers such as emails, URLs, IBANs, and configured credential values are
   replaced with typed aliases. The adapter holds their mappings in trusted
-  in-process dictionaries and resets that state on each read in this
-  configuration. Its `sc_handle_*` field is a response identifier, not an entry
+  in-process dictionaries. This configuration resets the local alias counter
+  on each read and clears all reference bindings at the next task. Its
+  `sc_handle_*` field is a response identifier, not an entry
   in the gateway's persistent protected-value store. The repository's core
   gateway separately implements stored handles and execution authorization.
 - The source also retains an optional model-generated fact path. Its historical
@@ -97,4 +106,3 @@ reference aliases inside the adapter before invoking tools.
 - This is the current local method source. It includes later refinements and
   does not, on its own, establish that a historical benchmark trace used this
   exact revision. No complete experimental reproduction is claimed.
-

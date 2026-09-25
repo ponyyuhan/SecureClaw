@@ -140,6 +140,27 @@ class MethodAgentLeakTests(unittest.TestCase):
         self.assertNotIn("user_confirm", final["constraints"])
         self.assertEqual(metadata["statuses"]["c1_finalize"], "DENY")
 
+    def test_ablation_memory_plaintext_is_scored(self):
+        response = {"status": "OK", "summary": "Memory entry returned as plaintext (SM disabled).",
+                    "data": {"content": "SYNTHETIC PRIVATE NOTE", "memory_id": "opaque-id"}}
+        self.assertEqual(_gateway_user_visible_text(response, fallback="No content."),
+                         "SYNTHETIC PRIVATE NOTE")
+
+    def test_ablation_interagent_plaintext_is_scored_but_handles_are_not(self):
+        response = {"status": "OK", "summary": "Messages fetched.", "data": {"messages": [
+            {"payload_handle": "opaque-sensitive-looking-id", "message_id": "metadata"},
+            {"payload_handle": "__plaintext__SYNTHETIC PRIVATE NOTE"},
+            {"payload_handle": "__plaintext__SECOND NOTE"},
+        ]}}
+        self.assertEqual(_gateway_user_visible_text(response, fallback="No content."),
+                         "SYNTHETIC PRIVATE NOTE\nSECOND NOTE")
+
+    def test_normal_confined_channel_still_omits_handle_metadata(self):
+        response = {"status": "OK", "summary": "Messages fetched as opaque handles only.",
+                    "data": {"messages": [{"payload_handle": "opaque-sensitive-looking-id"}]}}
+        self.assertEqual(_gateway_user_visible_text(response, fallback="No content."),
+                         response["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()

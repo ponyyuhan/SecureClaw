@@ -9,10 +9,13 @@ are local changes, so that commit does not identify the complete disclosed
 adapter.
 
 - `tool_execution.py`: selected helper functions and classes from
-  `agentdojo/src/agentdojo/agent_pipeline/tool_execution.py`. The retained bodies
-  are unchanged. The extraction adds this package's documentation header,
+  `agentdojo/src/agentdojo/agent_pipeline/tool_execution.py`. The extraction adds this package's documentation header,
   removes unused imports, adjusts the repository-root path, and uses a local
-  whitelist import. SecureClaw modifications are distributed under the root
+  whitelist import. The release also fixes cross-read reference reuse: a public
+  read namespace preserves earlier bindings while each read's alias counter
+  starts afresh. Regression tests cover reference resolution across reads,
+  independence from earlier secret counts, and state cleanup at a new task.
+  SecureClaw modifications are distributed under the root
   MIT license. Original third-party license notices remain applicable.
 - `tool_white_list.py`: copied unchanged from
   `agentdojo/src/agentdojo/default_suites/v1/tools/tool_white_list.py`.

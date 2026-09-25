@@ -156,6 +156,44 @@ def _round_robin_ids(
     return out
 
 
+def _generated_selection_rows(scenarios: Sequence[Any]) -> list[dict[str, Any]]:
+    """Selection metadata from generated inputs, without outcome files."""
+    return [
+        {
+            "scenario_id": str(getattr(scenario, "scenario_id", "")),
+            "kind": _scenario_kind(scenario),
+            "vertical": _vertical(scenario),
+            "attack_family": _attack_family(scenario) or "benign",
+        }
+        for scenario in scenarios
+    ]
+
+
+def _balanced_selection_ids(rows: Sequence[dict[str, Any]], *, seed: int) -> list[str]:
+    """Interleave kind and vertical so a bounded prefix covers both."""
+    buckets: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        buckets[(str(row["kind"]), str(row["vertical"]))].append(row)
+    ordered = {
+        key: _round_robin_ids(bucket, len(bucket), seed=seed)
+        for key, bucket in buckets.items()
+    }
+    result: list[str] = []
+    while any(ordered.values()):
+        for key in sorted(ordered):
+            if ordered[key]:
+                result.append(ordered[key].pop(0))
+    return result
+
+
+def _load_scenario_ids(path: Path, available: set[str]) -> list[str]:
+    ids = list(dict.fromkeys(line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()))
+    unknown = sorted(set(ids) - available)
+    if not ids or unknown:
+        raise ValueError(f"Scenario ID file is empty or contains unknown IDs: {unknown}")
+    return ids
+
+
 def select_experiment_ids(
     scenarios: Sequence[Any],
     experiment: str,
@@ -163,18 +201,18 @@ def select_experiment_ids(
     seed: int,
     three_seed_subset: bool,
     full_selection: bool = False,
+    historical_selection: bool = False,
 ) -> list[str]:
-    frozen = _load_frozen_rows()
+    generated_rows = _generated_selection_rows(scenarios)
+    if full_selection:
+        return _balanced_selection_ids(generated_rows, seed=seed)
+    # Historical outcome-enriched selection is opt-in. A clean checkout does
+    # not include historical model outputs and must still run the experiment.
+    frozen = _load_frozen_rows() if historical_selection else generated_rows
+    if historical_selection and not frozen:
+        raise ValueError("Historical selection requested, but no historical rows were found.")
     scenario_ids = {str(getattr(scenario, "scenario_id", "")) for scenario in scenarios}
     frozen = [row for row in frozen if str(row.get("scenario_id") or "") in scenario_ids]
-    if full_selection:
-        return list(
-            dict.fromkeys(
-                str(row.get("scenario_id") or "")
-                for row in frozen
-                if str(row.get("scenario_id") or "")
-            )
-        )
     attack_rows = [row for row in frozen if str(row.get("kind")) == "attack"]
     benign_rows = [row for row in frozen if str(row.get("kind")) == "benign"]
 
@@ -222,8 +260,13 @@ def select_experiment_ids(
     else:
         raise ValueError(f"unsupported experiment: {experiment}")
 
-    # Preserve order while removing any accidental duplicates.
-    return list(dict.fromkeys(selected))
+    selected = list(dict.fromkeys(selected))
+    if historical_selection:
+        return selected
+    selected_set = set(selected)
+    return _balanced_selection_ids(
+        [row for row in generated_rows if row["scenario_id"] in selected_set], seed=seed
+    )
 
 
 def _misclassification_configs() -> list[dict[str, Any]]:
@@ -687,9 +730,13 @@ def _build_manifest(
         "configs": list(configs),
         "expected_rows": len(selected) * len(configs) * len(seeds),
         "selection_scope": (
-            "full_frozen_agentleak_rows"
-            if bool(getattr(args, "full_selection", False))
-            else "rebuttal_stratified_subset"
+            "explicit_scenario_id_file"
+            if bool(getattr(args, "scenario_ids_file", None))
+            else "historical_outcome_enriched_subset"
+            if bool(getattr(args, "historical_selection", False))
+            else "generated_full_inventory"
+            if bool(getattr(args, "full_selection", False)) and not int(getattr(args, "max_cases", 0))
+            else "generated_outcome_blind_stratified_subset"
         ),
         "workers": int(args.workers),
         "temperature": 0.0,
@@ -729,14 +776,22 @@ def main() -> None:
     parser.add_argument("--scenario-seed", type=int, default=42)
     parser.add_argument("--run-seeds", default="0")
     parser.add_argument("--three-seed-subset", action="store_true")
-    parser.add_argument(
+    selection_group = parser.add_mutually_exclusive_group()
+    selection_group.add_argument(
         "--full-selection",
         action="store_true",
         help=(
-            "Use all frozen AgentLeak rows instead of the rebuttal stratified "
-            "subset. This changes only experiment coverage, not detector, "
-            "sanitizer, model prompts, labels, or metrics."
+            "Use all generated AgentLeak scenarios; no historical output files "
+            "are required. A --max-cases prefix is balanced by kind and vertical."
         ),
+    )
+    selection_group.add_argument(
+        "--scenario-ids-file", type=Path,
+        help="Explicit selection: one generated scenario ID per line, in the desired order.",
+    )
+    selection_group.add_argument(
+        "--historical-selection", action="store_true",
+        help="Opt into the original outcome-enriched subset using local historical rows.",
     )
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--timeout-s", type=float, default=120.0)
@@ -754,13 +809,17 @@ def main() -> None:
         run_seeds = [0, 1, 2]
     scenarios = generate_deterministic_scenarios(int(args.scenario_seed), total_count=1000)
     by_id = {str(getattr(scenario, "scenario_id", "")): scenario for scenario in scenarios}
-    selected_ids = select_experiment_ids(
-        scenarios,
-        args.experiment,
-        seed=int(args.scenario_seed),
-        three_seed_subset=bool(args.three_seed_subset),
-        full_selection=bool(args.full_selection),
-    )
+    if args.scenario_ids_file:
+        selected_ids = _load_scenario_ids(args.scenario_ids_file, set(by_id))
+    else:
+        selected_ids = select_experiment_ids(
+            scenarios,
+            args.experiment,
+            seed=int(args.scenario_seed),
+            three_seed_subset=bool(args.three_seed_subset),
+            full_selection=bool(args.full_selection),
+            historical_selection=bool(args.historical_selection),
+        )
     if int(args.max_cases) > 0:
         selected_ids = selected_ids[: int(args.max_cases)]
     selected = [by_id[scenario_id] for scenario_id in selected_ids if scenario_id in by_id]

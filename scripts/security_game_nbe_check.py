@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -93,6 +95,9 @@ def main() -> None:
     env_common["SIGNED_PIR"] = "1"
     env_common["MIRAGE_SESSION_ID"] = session_id
     env_common["DLP_MODE"] = "fourgram"
+    # The synthetic test driver acts as the trusted confirmation service.
+    confirm_key = secrets.token_bytes(32)
+    env_common["SECURECLAW_CONFIRM_TOKEN_KEY_HEX"] = confirm_key.hex()
 
     subprocess.run([sys.executable, "-m", "policy_server.build_dbs"], check=True, env=env_common)
 
@@ -145,7 +150,7 @@ def main() -> None:
                     "channel": "email",
                     "recipient": "alice@example.com",
                     "domain": dummy_domain,
-                    "text": "status update for confirmation path.",
+                    "text": "Synthetic AKIA fixture for confirmation path.",
                     "artifacts": [],
                 },
                 constraints={},
@@ -158,7 +163,7 @@ def main() -> None:
                     "channel": "email",
                     "recipient": "alice@example.com",
                     "domain": dummy_domain,
-                    "text": "status update for confirmation path.",
+                    "text": "Synthetic AKIA fixture for confirmation path.",
                     "artifacts": [],
                 },
                 constraints={},
@@ -472,7 +477,7 @@ def main() -> None:
             "channel": "email",
             "recipient": "alice@example.com",
             "domain": dummy_domain,
-            "text": "status update for confirmation path.",
+            "text": "Synthetic AKIA fixture for confirmation path.",
             "artifacts": [],
             "dlp_mode": "fourgram",
             "evidence": {},
@@ -490,27 +495,37 @@ def main() -> None:
         req_confirm_ok["action_id"] = action_id_confirm2
         req_confirm_ok["commit"] = commit_confirm2
         req_confirm_ok["user_confirm"] = True
+        # A Boolean supplied by the runtime is insufficient in the bound-token mode.
+        no_token = requests.post(f"{executor_url}/exec/send_message", json=req_confirm_ok, timeout=5).json()
+        _, no_token_check = _expect_status("confirmation_boolean_without_token_denied", no_token, "DENY")
+        no_token_check["ok"] = bool(no_token_check["ok"] and no_token.get("reason_code") == "BAD_CONFIRM_TOKEN")
+        req_confirm_ok["confirm_token"] = hmac.new(
+            confirm_key,
+            f"{action_id_confirm}|{(commit_confirm.get('policy0') or {}).get('request_sha256', '')}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        wrong_token = requests.post(f"{executor_url}/exec/send_message", json=req_confirm_ok, timeout=5).json()
+        _, wrong_token_check = _expect_status("confirmation_token_for_other_action_denied", wrong_token, "DENY")
+        wrong_token_check["ok"] = bool(wrong_token_check["ok"] and wrong_token.get("reason_code") == "BAD_CONFIRM_TOKEN")
+        report["confirmation_binding_checks"] = [no_token_check, wrong_token_check]
+        req_confirm_ok["confirm_token"] = hmac.new(
+            confirm_key,
+            f"{action_id_confirm2}|{(commit_confirm2.get('policy0') or {}).get('request_sha256', '')}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
         r_confirm_ok = requests.post(f"{executor_url}/exec/send_message", json=req_confirm_ok, timeout=5).json()
         c_ok8, c_item8 = _expect_status("need_confirm_accepts_with_user_confirm", r_confirm_ok, "OK")
         c_item8["reason_code"] = r_confirm_ok.get("reason_code")
 
-        # Dynamic oracle for confirmation semantics:
-        # - If no-confirm path is explicitly gated by REQUIRE_CONFIRM, then with-confirm must accept.
-        # - Otherwise both should accept (path does not require confirmation under current policy).
-        if str(r_need_confirm.get("status") or "").upper() == "DENY":
-            expect_gate = str(r_need_confirm.get("reason_code") or "") == "REQUIRE_CONFIRM"
-            c_item7["expect_gate"] = bool(expect_gate)
-            c_item7["ok"] = bool(expect_gate)
-            c_item8["ok"] = bool(c_ok8)
-        else:
-            c_item7["expect_gate"] = False
-            c_item7["ok"] = str(r_need_confirm.get("status") or "").upper() == "OK"
-            c_item8["ok"] = bool(c_ok8)
+        # This fixture contains a configured DLP marker, so confirmation must be required.
+        c_item7["expect_gate"] = True
+        c_item7["ok"] = bool(c_ok7 and r_need_confirm.get("reason_code") == "REQUIRE_CONFIRM")
+        c_item8["ok"] = bool(c_ok8)
         report["checks"].append(c_item8)
 
-        all_ok = all(bool(x.get("ok")) for x in report["checks"])
-        n_attacks = sum(1 for x in report["checks"] if x.get("want", "").upper() == "DENY" and x.get("ok"))
-        n_controls = sum(1 for x in report["checks"] if x.get("want", "").upper() == "OK" and x.get("ok"))
+        all_ok = all(bool(x.get("ok")) for x in report["checks"] + report["confirmation_binding_checks"])
+        n_attacks = sum(1 for x in report["checks"] if x.get("want", "").upper() == "DENY" and x.get("got", "").upper() == "DENY" and x.get("ok"))
+        n_controls = sum(1 for x in report["checks"] if x.get("want", "").upper() == "OK" and x.get("got", "").upper() == "OK" and x.get("ok"))
         report["status"] = "OK" if all_ok else "FAIL"
         report["n_checks"] = len(report["checks"])
         report["n_attacks_denied"] = n_attacks

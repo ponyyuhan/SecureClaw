@@ -308,6 +308,7 @@ class SecureClawToolsExecutor(ToolsExecutor):
         self._turn_request = ""
         self._alias_to_real: dict[str, str] = {}
         self._real_to_alias: dict[str, str] = {}
+        self._alias_read_index = 0
         # Rebuttal accommodation ablation.  The historical ablation script set
         # this variable, but the executor never consumed it, so its "no alias"
         # arm was identical to the default.  Keep the deployed default enabled
@@ -339,8 +340,8 @@ class SecureClawToolsExecutor(ToolsExecutor):
         # Δ-hardening knobs (Appendix, paired-summary measurement):
         # gate the request-conditioned augmentation that leaks via
         # counterparty_mentioned_in_request / cashflow_relation_to_request_target,
-        # reset the per-turn alias table on every read so that alias
-        # indices do not carry information from prior reads within a turn,
+        # reset the alias counter on every read so that its local indices
+        # do not carry information from prior reads within a turn,
         # and canonicalize common email/domain obfuscations before the
         # sensitive-pattern regex.
         # DEFAULT: ALL ON. The hardened configuration IS the deployed
@@ -401,6 +402,7 @@ class SecureClawToolsExecutor(ToolsExecutor):
             self._turn_id = turn_id
             self._alias_to_real.clear()
             self._real_to_alias.clear()
+            self._alias_read_index = 0
             self._turn_request = self._first_user_request(query, messages)
             self._turn_safe_read_tools = []
             self._turn_used_safe_read_tools = set()
@@ -645,9 +647,13 @@ class SecureClawToolsExecutor(ToolsExecutor):
             return raw_value
         if raw_value in self._real_to_alias:
             return self._real_to_alias[raw_value]
-        alias = str(display_override or f"{token_type}_{len(self._alias_to_real) + 1}").strip()
+        alias = str(display_override or f"{token_type}_{len(self._real_to_alias) + 1}").strip()
         if not alias:
-            alias = f"{token_type}_{len(self._alias_to_real) + 1}"
+            alias = f"{token_type}_{len(self._real_to_alias) + 1}"
+        if self._per_read_alias_reset and self._alias_read_index > 1:
+            # The read ordinal is public. A fresh namespace prevents a later
+            # read from changing the meaning of an earlier visible reference.
+            alias = f"{alias}_R{self._alias_read_index}"
         base_alias = alias
         suffix = 2
         while alias in self._alias_to_real and self._alias_to_real[alias] != raw_value:
@@ -732,7 +738,7 @@ class SecureClawToolsExecutor(ToolsExecutor):
         stem = clean.rstrip("._-")
         if not stem:
             stem = clean
-        display = f"{stem}_REF_{len(self._alias_to_real) + 1}"
+        display = f"{stem}_REF_{len(self._real_to_alias) + 1}"
         return self._register_alias("TARGET_REF", raw, display_override=display)
 
     @staticmethod
@@ -933,10 +939,9 @@ class SecureClawToolsExecutor(ToolsExecutor):
         if counterparty:
             if self._strict_symbolic_read:
                 # Strict-symbolic closure: replace the plaintext counterparty
-                # with a PARTY_REF alias. Since per_read_alias_reset clears the
-                # alias table at the top of each read, the first counterparty
-                # in any turn registers as PARTY_REF_1 → byte-stable between
-                # paired inputs differing only in counterparty name.
+                # with a PARTY_REF alias. The local counter resets at each
+                # read and the namespace uses its public ordinal, so paired
+                # inputs differing only in counterparty name remain stable.
                 out["counterparty"] = self._register_alias("PARTY_REF", counterparty)
             else:
                 out["counterparty"] = counterparty
@@ -1345,10 +1350,10 @@ class SecureClawToolsExecutor(ToolsExecutor):
         if semantic_failure is not None:
             return semantic_failure
         if self._per_read_alias_reset:
-            # Reset the per-turn alias registry at the start of every read
-            # so alias indices cannot carry information about prior reads
-            # within the same turn (Δ-hardening).
-            self._alias_to_real = {}
+            # Keep earlier reference bindings for the rest of this task, but
+            # reset the current read's value map and counter (Δ-hardening).
+            # The public read ordinal separates otherwise identical tokens.
+            self._alias_read_index += 1
             self._real_to_alias = {}
         summarized_result = self._augment_structured_summary(tool_result)
         summary_value = self._aliasize_obj(summarized_result)
