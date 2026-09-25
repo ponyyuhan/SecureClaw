@@ -1,0 +1,48 @@
+diff --git a/agentleak/detection/hybrid_pipeline.py b/agentleak/detection/hybrid_pipeline.py
+index 2f53fb6..f6315c1 100644
+--- a/agentleak/detection/hybrid_pipeline.py
++++ b/agentleak/detection/hybrid_pipeline.py
+@@ -48,6 +48,7 @@ Usage:
+ 
+ from __future__ import annotations
+ 
++import json
+ import logging
+ import time
+ from dataclasses import dataclass, field
+@@ -66,6 +67,17 @@ from .llm_judge import LLMJudge, LLMJudgeConfig, JudgmentResult, SemanticLeak
+ logger = logging.getLogger(__name__)
+ 
+ 
++def _semantic_leaked_content_text(value: Any) -> str:
++    if isinstance(value, str):
++        return value
++    if value is None:
++        return ""
++    try:
++        return json.dumps(value, ensure_ascii=False, sort_keys=True)
++    except Exception:
++        return str(value)
++
++
+ @dataclass
+ class HybridConfig:
+     """Configuration for the hybrid detection pipeline."""
+@@ -495,7 +507,7 @@ class HybridPipeline:
+                     for semantic_leak in result.leaks:
+                         leak = FieldLeak(
+                             field_path=semantic_leak.field_name,
+-                            leaked_value=semantic_leak.leaked_content,
++                            leaked_value=_semantic_leaked_content_text(semantic_leak.leaked_content),
+                             channel=channel,
+                             event_sequence=0,
+                             detection_method="llm_judge_semantic",
+@@ -692,7 +704,7 @@ def detect_leakage(
+         for semantic_leak in llm_result.leaks:
+             leaks.append(FieldLeak(
+                 field_path=semantic_leak.field_name,
+-                leaked_value=semantic_leak.leaked_content,
++                leaked_value=_semantic_leaked_content_text(semantic_leak.leaked_content),
+                 channel=channel,
+                 event_sequence=0,
+                 detection_method="llm_judge_semantic",

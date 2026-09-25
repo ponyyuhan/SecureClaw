@@ -6,7 +6,7 @@ Research runtime accompanying **SecureClaw: Clawing Back Control of LLM Agents**
 
 SecureClaw moves sensitive data access and action authorization into a mediated runtime. This reference implementation includes opaque handles, declassification, two policy servers, PREVIEW–COMMIT authorization, executor-side verification of both policy-server MACs, replay protection, and capsule mediation examples.
 
-This repository includes the core runtime and the method adapters for schema-aware summaries, field classification, and channel mediation, together with synthetic demonstrations and local tests. Experiment results, raw model trajectories, datasets, and intermediate orchestration scripts are omitted. The local tests check implementation behavior; they do not regenerate the paper's aggregate results. See [the method adapters](method_adapters/README.md) and [the paper-to-code map](docs/paper_to_code.md) for source correspondence and configuration.
+This repository includes the SecureClaw runtime, method adapters, experiment runners, scoring code, configurations, and local tests. The [experiment guide](experiments/README.md) explains how to retrieve the upstream benchmarks and baseline implementations and run the evaluations. Generated results, raw model traces, caches, and temporary development files are not bundled. See [the paper-to-code map](docs/paper_to_code.md) for the implementation and evaluation entry points.
 
 ## Quick start
 
@@ -60,7 +60,7 @@ The [AgentDojo/ASB adapter](method_adapters/agentdojo/README.md) provides the ex
 
 The [AgentLeak adapters](method_adapters/agentleak/README.md) provide field classification and masking, protected-value registration, the contextual classifier, and C1/C2/C5 mediation. The contextual classifier is a separate diagnostic component and requires an explicit model request; local tests make no model calls.
 
-These adapters preserve the relevant local method code. Their source and packaging changes are documented; they are not a complete snapshot of every historical experimental environment.
+The original benchmark runners and their scoring paths are also included; see [primary evaluations](experiments/README.md), [additional experiments](rebuttal/README.md), and [mechanism evaluations](experiments/mechanism_evaluations.md). Required upstream revisions, local source patches, dependencies, and commands are documented. New runs generate their own result files.
 
 ## MCP and optional agent integrations
 
@@ -93,6 +93,8 @@ Existing ablation and insecure-demo switches are retained for research compatibi
 | `secureclaw/`, `common/` | Task capsules, canonical request binding, tokens, and shared utilities |
 | `agent/`, `integrations/` | Built-in synthetic agent and optional client adapters |
 | `method_adapters/` | Source adapters for summaries, classification, and benchmark-facing method integration |
+| `experiments/`, `scripts/` | Benchmark setup, primary evaluation runners, scoring, and mechanism experiments |
+| `rebuttal/experiments/` | Additional model-transfer, baseline, classification, and accommodation experiments |
 | `tests/`, `scripts/validate_runtime.py` | Portable tests and local integration validation |
 | `policy_server_rust/` | Optional Rust policy-server implementation; not required by quick start |
 

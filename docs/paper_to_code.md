@@ -1,6 +1,6 @@
 # Paper-to-code map
 
-This repository is an executable runtime reference for [SecureClaw: Clawing Back Control of LLM Agents](https://openreview.net/forum?id=0omFi3ZiBf). It includes the core mechanisms and selected method adapters; demonstrations use synthetic data and simulated external sinks. It is not an exact snapshot of the paper's benchmark environment.
+This repository is an executable runtime reference for [SecureClaw: Clawing Back Control of LLM Agents](https://openreview.net/forum?id=0omFi3ZiBf). It includes the core mechanisms, method adapters, and experiment source. Demonstrations use synthetic data and simulated external sinks; the benchmark runners use the upstream task environments and evaluators documented in the experiment guide.
 
 | Mechanism | Implementation | Local validation |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ The policy servers run together on loopback for convenience. This validates prot
 
 The source of the paper's quantitative claims is the paper and its official author discussion. The new local validation results in `release_notes.md` concern this code release only. They neither replace nor independently reproduce the paper or rebuttal numbers.
 
-This repository does not ship benchmark datasets, complete experiment runners, baseline implementations, original model traces, private review material, or the full statistical reconstruction pipeline. The method adapter source is included without those artifacts. In particular, `scripts/validate_runtime.py` has 50 local mechanism checks and is distinct from the paper's bypass suite. The filename `test_agentleak_channels.py` refers to channel mechanisms; these tests do not run the AgentLeak benchmark.
+The experiment runners, scoring code, configurations, and dependency retrieval instructions are included. Upstream benchmark and baseline code is retrieved at the recorded revisions and patched with the supplied integration changes. Original model traces, stored experiment outputs, private review material, and temporary working files are not bundled. In particular, `scripts/validate_runtime.py` has 50 local mechanism checks and is distinct from the paper's bypass suite. The filename `test_agentleak_channels.py` refers to channel mechanisms; these tests do not run the AgentLeak benchmark.
 
 ## Method adapters
 
@@ -38,3 +38,17 @@ This repository does not ship benchmark datasets, complete experiment runners, b
 | C1/C2/C5 gateway mediation | `method_adapters/agentleak/channels.py` | Synthetic MCP responses and calls |
 
 The summary's item limit applies to each container and its character limit to each text value, with additional truncation indicators. Select `SECURECLAW_LLM_READ_SUMMARY=0` for the deterministic core. The source retains other configurations; their presence is not evidence that a particular historical experiment used them. The adapter READMEs distinguish benchmark metadata, in-process aliases, and gateway-stored handles.
+
+## Evaluation source
+
+| Evaluation | Entry points |
+| --- | --- |
+| Primary AgentDojo | `scripts/run_agentdojo_native_plain_secureclaw.py`, upstream patched `run/eval.py` |
+| Primary ASB | `scripts/asb_five_baseline_compare.py` |
+| Primary AgentLeak C1/C2/C5 | `scripts/paper_parity_agentleak_eval.py`, `scripts/agentleak_native_baselines.py` |
+| Channel diagnostics | `scripts/agentleak_channel_baseline_compare.py`, channel/native helpers |
+| Main baseline comparison and aggregation | `scripts/run_drift_ipiguard_full_lowmem.sh`, `scripts/run_agentdojo_faramesh.py`, `scripts/agentdojo_five_baseline_fair_report.py` |
+| Additional evaluation (Appendix C) | `rebuttal/experiments/`, documented in `rebuttal/README.md` |
+| Formal-mechanism tests, summary diagnostic, ablations and timing | `experiments/mechanism_evaluations.md` |
+
+See `experiments/README.md` for benchmark input retrieval, exact command examples, dependencies, and scoring paths. The public code does not require previously generated result files; executing the runners produces new outputs. Hosted-model responses can vary between runs.

@@ -7,4 +7,4 @@ These directories contain the existing method implementation used by the authors
 
 Use each adapter's dependency and configuration instructions. Local tests use synthetic inputs and do not launch paid inference or benchmark experiments. Source attribution and extraction changes are recorded alongside the code. Upstream licenses are retained.
 
-This package exposes method code; it is not a complete archive of the environments or outputs that produced every paper table.
+The full experiment entry points and dependency setup are documented in [the experiment guide](../experiments/README.md). Historical output files are not required inputs to those runs.

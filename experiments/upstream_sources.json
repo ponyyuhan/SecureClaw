@@ -1,0 +1,106 @@
+{
+  "ipiguard": {
+    "url": "https://github.com/Greysahy/ipiguard.git",
+    "revision": "4e686ed2f62c135cb12564a4466daa95f3ace878",
+    "patch": "patches/ipiguard.patch",
+    "modified_source_files": [
+      "agentdojo/src/agentdojo/agent_pipeline/agent_pipeline.py",
+      "agentdojo/src/agentdojo/agent_pipeline/llms/openai_llm.py",
+      "agentdojo/src/agentdojo/agent_pipeline/llms/react_llm.py",
+      "agentdojo/src/agentdojo/agent_pipeline/tool_execution.py",
+      "agentdojo/src/agentdojo/default_suites/v1/tools/slack.py",
+      "agentdojo/src/agentdojo/task_suite/task_suite.py",
+      "agentdojo/src/agentdojo/types.py",
+      "run/eval.py"
+    ],
+    "license_files": [
+      "licenses/ipiguard_LICENSE",
+      "licenses/AgentDojo_LICENSE"
+    ]
+  },
+  "ASB": {
+    "url": "https://github.com/agiresearch/ASB.git",
+    "revision": "eac7bcf38c116f42b46e6d480e56e599b99e73c2",
+    "patch": "patches/ASB.patch",
+    "modified_source_files": [
+      "aios/llm_core/llm_classes/gpt_llm.py",
+      "aios/llm_core/llm_classes/model_registry.py",
+      "aios/llm_core/llms.py",
+      "aios/utils/utils.py",
+      "main_attacker.py",
+      "pyopenagi/agents/react_agent_attack.py"
+    ],
+    "license_files": [
+      "licenses/ASB_LICENSE"
+    ]
+  },
+  "DRIFT": {
+    "url": "https://github.com/SaFo-Lab/DRIFT.git",
+    "revision": "7c7d98274d053f00313aecc61c6dfb039b484ba0",
+    "patch": "patches/DRIFT.patch",
+    "modified_source_files": [
+      "ASB_DRIFT/aios/llm_core/llm_classes/gpt_llm.py",
+      "ASB_DRIFT/aios/llm_core/llm_classes/model_registry.py",
+      "ASB_DRIFT/aios/utils/utils.py",
+      "ASB_DRIFT/main_attacker.py",
+      "ASB_DRIFT/pyopenagi/agents/drift.py",
+      "ASB_DRIFT/pyopenagi/agents/react_agent_attack.py",
+      "DRIFTLLM.py",
+      "client.py",
+      "prompts.py"
+    ],
+    "license_files": [
+      "licenses/DRIFT_ASB_LICENSE"
+    ]
+  },
+  "faramesh-core": {
+    "url": "https://github.com/faramesh/faramesh-core.git",
+    "revision": "650d59c68cf72349e3a13fcd682e1548094f8332",
+    "patch": null,
+    "modified_source_files": [],
+    "license_files": [
+      "licenses/faramesh-core_LICENSE",
+      "licenses/faramesh-core_NOTICE"
+    ]
+  },
+  "agentleak_official": {
+    "url": "https://github.com/Privatris/AgentLeak.git",
+    "revision": "6a4c9ced740d68ee50f932e48e941aa7b4e2ee7b",
+    "patch": "patches/agentleak_official.patch",
+    "modified_source_files": [
+      "agentleak/detection/hybrid_pipeline.py"
+    ],
+    "license_files": [
+      "licenses/agentleak_official_LICENSE"
+    ]
+  },
+  "agentdojo": {
+    "url": "https://github.com/ethz-spylab/agentdojo.git",
+    "revision": "462c88ddf596cb745882702f9999c8aeb5fe467f",
+    "patch": null,
+    "modified_source_files": [],
+    "license_files": [
+      "licenses/AgentDojo_LICENSE"
+    ]
+  },
+  "progent": {
+    "url": "https://github.com/sunblaze-ucb/progent.git",
+    "revision": "9befb41cbf992b49dbf035cbd3d53eb953d3b351",
+    "patch": null,
+    "modified_source_files": [],
+    "license_files": [
+      "licenses/progent_AgentDojo_LICENSE"
+    ]
+  },
+  "camel-prompt-injection": {
+    "url": "https://github.com/google-research/camel-prompt-injection.git",
+    "revision": "f083b6b396399d3b3c7f2ddaf613a5945eaf32d8",
+    "patch": "patches/camel-prompt-injection.patch",
+    "modified_source_files": [
+      "src/camel/interpreter/interpreter.py"
+    ],
+    "license_files": [
+      "licenses/camel-prompt-injection_LICENSE"
+    ]
+  }
+}

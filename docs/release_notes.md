@@ -47,3 +47,11 @@ The original repository contained no project license. The authors selected the M
 Added the existing AgentDojo/ASB method executor and AgentLeak field-classification, masking, registration, contextual-classification, and channel-mediation adapters. Extraction retains the relevant original method bodies; integration changes and upstream license notices are documented alongside each adapter. Experiment outputs, model traces, datasets, historical repair scripts, and batch orchestration remain excluded.
 
 The full offline suite passed **55 tests** with Python 3.11 and AgentDojo 0.1.35, including 17 new adapter checks. These checks did not invoke a hosted model or external action. No existing core-runtime mechanism or safety fix was changed in this update. Original release validation above records the earlier runtime/service and capsule checks; those were not rerun for this source-only addition.
+
+## Evaluation-source completion
+
+The release now also includes the original primary benchmark runners and scorers, baseline integrations, additional experiment entry points, and mechanism-evaluation scripts. The experiment guide supplies dependency revisions, integration patches, third-party attribution, environment settings, and commands. The patches were applied against their recorded upstream revisions and checked to reconstruct the local source.
+
+The complete offline suite still passes 55 tests. CLI/import and inventory checks cover the AgentDojo 97 benign/629 attacked cases, ASB 2,000 cases, and AgentLeak 500 benign/496 attacked cases. Small hosted-model checks exercise the disclosed runner paths; they are not a repeat of all paper experiments. Their generated outputs remain local, as do all historical experiment results and traces.
+
+The accommodation runner's existing protocol-document dependency is supplied at `rebuttal/EXPERIMENT_PROTOCOL.md`. This is a public protocol description for the disclosed source; the original private development plan and review correspondence are not bundled. Core runtime enforcement and existing tests are unchanged by these packaging additions.

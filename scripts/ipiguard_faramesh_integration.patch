@@ -1,0 +1,206 @@
+diff --git a/agentdojo/src/agentdojo/agent_pipeline/agent_pipeline.py b/agentdojo/src/agentdojo/agent_pipeline/agent_pipeline.py
+index 1e75fb7..8f953d2 100644
+--- a/agentdojo/src/agentdojo/agent_pipeline/agent_pipeline.py
++++ b/agentdojo/src/agentdojo/agent_pipeline/agent_pipeline.py
+@@ -23,6 +23,7 @@ from agentdojo.agent_pipeline.pi_detector import TransformersBasedPIDetector
+ from agentdojo.agent_pipeline.tool_execution import (
+     ToolsExecutionLoop,
+     ToolsExecutor,
++    FarameshToolsExecutor,
+     ReActToolsExecutionLoop,
+     ReActToolsExecutor,
+     DagToolsExecutionLoop,
+@@ -41,6 +42,7 @@ TOOL_FILTER_PROMPT = (
+ )
+ 
+ DEFENSES = [
++    "faramesh",
+     "tool_filter",
+     "transformers_pi_detector",
+     "spotlighting_with_delimiting",
+@@ -170,6 +172,15 @@ class AgentPipeline(BasePipelineElement):
+             pipeline.name = llm_name
+             return pipeline
+         
++        if config.defense == "faramesh":
++            max_iters = int(os.getenv("FARAMESH_MAX_TOOL_ITERS", "25"))
++            if max_iters < 5:
++                max_iters = 5
++            tools_loop = ToolsExecutionLoop([FarameshToolsExecutor(), llm], max_iters=max_iters)
++            pipeline = cls([system_message_component, init_query_component, llm, tools_loop])
++            pipeline.name = f"{llm_name}-{config.defense}"
++            return pipeline
++
+         if config.defense == "reflection":
+             query_component = ReActQuery()
+             client = llm.client
+diff --git a/agentdojo/src/agentdojo/agent_pipeline/tool_execution.py b/agentdojo/src/agentdojo/agent_pipeline/tool_execution.py
+index f551f4b..c239937 100644
+--- a/agentdojo/src/agentdojo/agent_pipeline/tool_execution.py
++++ b/agentdojo/src/agentdojo/agent_pipeline/tool_execution.py
+@@ -1,5 +1,7 @@
+ from collections.abc import Callable, Sequence
+ 
++import os
++import requests
+ import yaml
+ import json
+ from pydantic import BaseModel
+@@ -126,6 +128,157 @@ class ToolsExecutor(BasePipelineElement):
+         return query, runtime, env, [*messages, *tool_call_results], extra_args
+ 
+ 
++
++
++class FarameshToolsExecutor(ToolsExecutor):
++    _LOCAL_STATE_EFFECT_TOOLS = {
++        "update_password",
++        "update_user_info",
++        "remove_user_from_slack",
++        "cancel_calendar_event",
++        "create_calendar_event",
++        "reserve_car_rental",
++        "reserve_hotel",
++        "reserve_restaurant",
++        "add_calendar_event_participants",
++        "append_to_file",
++        "create_file",
++        "delete_email",
++        "delete_file",
++        "reschedule_calendar_event",
++    }
++
++    _RECIPIENT_KEYS = (
++        "recipient",
++        "recipients",
++        "user_email",
++        "email",
++        "participants",
++        "channel",
++        "user",
++        "to",
++        "target",
++        "destination",
++        "payee",
++        "account",
++        "iban",
++    )
++
++    def __init__(self, tool_output_formatter: Callable[[FunctionReturnType], str] = tool_result_to_str) -> None:
++        super().__init__(tool_output_formatter=tool_output_formatter)
++        self._base_url = str(os.getenv("AGENTDOJO_FARAMESH_BASE_URL", "http://127.0.0.1:8000")).rstrip("/")
++        self._agent_id = str(os.getenv("AGENTDOJO_FARAMESH_AGENT_ID", "agentdojo-faramesh"))
++        self._timeout_s = float(os.getenv("AGENTDOJO_FARAMESH_TIMEOUT_S", "30") or "30")
++
++    @classmethod
++    def _category_for_tool(cls, tool_name: str) -> str:
++        if str(tool_name or "") in whitelist:
++            return "readonly"
++        if str(tool_name or "") in cls._LOCAL_STATE_EFFECT_TOOLS:
++            return "local_state"
++        return "effect"
++
++    @classmethod
++    def _extract_recipient(cls, tool_args: dict) -> str:
++        for key in cls._RECIPIENT_KEYS:
++            value = tool_args.get(key)
++            if isinstance(value, list) and value:
++                return str(value[0]).strip()
++            if value not in (None, ""):
++                return str(value).strip()
++        return ""
++
++    @staticmethod
++    def _extract_domain(tool_args: dict, recipient: str) -> str:
++        raw_domain = str(tool_args.get("domain") or "").strip().lower()
++        if raw_domain:
++            return raw_domain
++        raw_url = str(tool_args.get("url") or "").strip()
++        if raw_url:
++            probe = raw_url if "://" in raw_url else f"https://{raw_url}"
++            try:
++                from urllib.parse import urlparse
++                return str(urlparse(probe).netloc or "").strip().lower()
++            except Exception:
++                return ""
++        if "@" in recipient:
++            return recipient.rsplit("@", 1)[1].strip().lower()
++        return ""
++
++    def _submit(self, payload: dict) -> dict:
++        resp = requests.post(f"{self._base_url}/v1/actions", json=payload, timeout=self._timeout_s)
++        resp.raise_for_status()
++        return resp.json()
++
++    def _report(self, action_id: str, *, success: bool, error: str | None = None) -> None:
++        payload = {"success": bool(success)}
++        if error:
++            payload["error"] = str(error)
++        resp = requests.post(f"{self._base_url}/v1/actions/{action_id}/result", json=payload, timeout=self._timeout_s)
++        resp.raise_for_status()
++
++    def query(
++        self,
++        query: str,
++        runtime: FunctionsRuntime,
++        env: Env = EmptyEnv(),
++        messages: Sequence[ChatMessage] = [],
++        extra_args: dict = {},
++    ) -> tuple[str, FunctionsRuntime, Env, Sequence[ChatMessage], dict]:
++        if len(messages) == 0:
++            return query, runtime, env, messages, extra_args
++        if messages[-1]["role"] != "assistant":
++            return query, runtime, env, messages, extra_args
++        if messages[-1]["tool_calls"] is None or len(messages[-1]["tool_calls"]) == 0:
++            return query, runtime, env, messages, extra_args
++
++        tool_call_results = []
++        for tool_call in messages[-1]["tool_calls"]:
++            if tool_call.function == EMPTY_FUNCTION_NAME:
++                tool_call_results.append(ChatToolResultMessage(role="tool", content="", tool_call_id=tool_call.id, tool_call=tool_call, error="Empty function name provided. Provide a valid function name."))
++                continue
++            if tool_call.function not in (tool.name for tool in runtime.functions.values()):
++                tool_call_results.append(ChatToolResultMessage(role="tool", content="", tool_call_id=tool_call.id, tool_call=tool_call, error=f"Invalid tool {tool_call.function} provided."))
++                continue
++
++            raw_args = dict(tool_call.args or {})
++            recipient = self._extract_recipient(raw_args)
++            domain = self._extract_domain(raw_args, recipient)
++            payload = {
++                "agent_id": self._agent_id,
++                "tool": self._category_for_tool(str(tool_call.function)),
++                "operation": str(tool_call.function),
++                "params": {**raw_args, "recipient": recipient, "domain": domain},
++                "context": {
++                    "agent_id": self._agent_id,
++                    "suite": str(os.getenv("FARAMESH_SUITE_NAME", "")),
++                    "mode": str(os.getenv("FARAMESH_RUN_MODE", "")),
++                },
++            }
++            try:
++                action = self._submit(payload)
++                status = str(action.get("status") or "").strip().lower()
++                decision = str(action.get("decision") or "").strip().lower()
++            except Exception as exc:
++                tool_call_results.append(ChatToolResultMessage(role="tool", content="", tool_call_id=tool_call.id, tool_call=tool_call, error=f"FarameshError:{type(exc).__name__}:{exc}"))
++                continue
++
++            if decision == "deny" or status == "denied" or status == "pending_approval":
++                reason = str(action.get("reason_code") or action.get("reason") or "FARAMESH_DENY")
++                tool_call_results.append(ChatToolResultMessage(role="tool", content=json.dumps({"status": "DENY", "reason": reason}), tool_call_id=tool_call.id, tool_call=tool_call, error=f"FarameshDenied:{reason}"))
++                continue
++
++            tool_call_result, error = runtime.run_function(env, tool_call.function, raw_args)
++            if action.get("id"):
++                try:
++                    self._report(str(action["id"]), success=(error is None), error=error)
++                except Exception:
++                    pass
++            formatted_tool_call_result = self.output_formatter(tool_call_result)
++            tool_call_results.append(ChatToolResultMessage(role="tool", content=formatted_tool_call_result, tool_call_id=tool_call.id, tool_call=tool_call, error=error))
++        return query, runtime, env, [*messages, *tool_call_results], extra_args
++
++
+ class ToolsExecutionLoop(BasePipelineElement):
+     """Executes in loop a sequence of pipeline elements related to tool execution until the
+     LLM does not return any tool calls.

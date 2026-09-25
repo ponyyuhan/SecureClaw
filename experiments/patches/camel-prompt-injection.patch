@@ -1,0 +1,19 @@
+diff --git a/src/camel/interpreter/interpreter.py b/src/camel/interpreter/interpreter.py
+index 73d88e1..a0c2179 100644
+--- a/src/camel/interpreter/interpreter.py
++++ b/src/camel/interpreter/interpreter.py
+@@ -1822,7 +1822,13 @@ def _eval_for(
+             return EvalResult(final_val_res, namespace, tool_calls_chain, dependencies)
+ 
+     dependencies = list(dependencies)
+-    dependencies.remove(iterable)
++    # Remove the exact iterable object appended before the loop.  Using
++    # list.remove() invokes CaMeLValue.__eq__, which recursively compares
++    # dependency graphs and can overflow on valid deep Slack task objects.
++    for idx, dependency in enumerate(dependencies):
++        if dependency is iterable:
++            del dependencies[idx]
++            break
+ 
+     return EvalResult(result.Ok(value.CaMeLNone(Capabilities.default(), ())), namespace, tool_calls_chain, dependencies)
+ 
