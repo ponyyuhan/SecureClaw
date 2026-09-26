@@ -1,5 +1,15 @@
 # Release preparation notes
 
+## 2026-09-26 — Repository review and documentation
+
+- Removed a legacy authorization fallback from the simulated message and fetch endpoints. Signed lookup results did not bind the destination or body of an execution request and cannot substitute for the existing request-bound COMMIT proofs. Requests without both COMMIT proofs are now rejected. The normal gateway flow already supplies these proofs; explicit research bypass settings are unchanged.
+- Preserved the invoking Python interpreter for direct CLI subprocesses. The MCP launcher now finds the repository virtual environment without shell activation and supports an explicit `SECURECLAW_PYTHON` override.
+- Declared the `jsonschema` dependency used by capsule verification and excluded fetched dependencies, experiment virtual environments, and generated run outputs from Docker build contexts.
+- Reorganized the README and added setup, configuration, integration, and contribution guides, with original cartoon PNG illustrations. Added a GitHub Actions workflow for offline tests on Linux/macOS and local runtime checks on Linux.
+- Local validation after these fixes: **97 offline tests passed** with Python 3.11 and the optional AgentDojo dependency; a fresh Python 3.14.6 environment passed **50 runtime checks**, both built-in agent demos, and real MCP initialization without an activated shell. No hosted-model call was made. These checks do not rerun the paper's benchmarks or establish compatibility for the optional external clients, Rust server, Docker image, or OS capsule on new platforms.
+
+## Original preparation
+
 Prepared on 2026-09-25 from the authors' public [ponyyuhan/secureclaw](https://github.com/ponyyuhan/secureclaw) runtime at commit `11e95bcdcf0943fc459060e3239af3948c0adf82`. The target repository was empty when inspected. This release uses a clean initial history rather than importing unrelated local project history.
 
 ## Included changes

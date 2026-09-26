@@ -1,0 +1,55 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            method_adapters/agentdojo/requirements.txt
+      - name: Install runtime and optional adapter dependencies
+        run: python -m pip install -r requirements.txt -r method_adapters/agentdojo/requirements.txt
+      - name: Run offline tests
+        run: python -m unittest discover -s tests -v
+
+  runtime:
+    name: Local runtime (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Start and check services
+        run: |
+          bash scripts/dev_up.sh
+          bash scripts/check_health.sh
+      - name: Validate runtime and run the local demo
+        run: |
+          python scripts/validate_runtime.py
+          python main.py agent-demo both
+      - name: Stop services
+        if: always()
+        run: bash scripts/dev_down.sh

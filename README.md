@@ -1,16 +1,30 @@
-# SecureClaw
+<p align="center">
+  <img src="docs/assets/secureclaw-banner.png" alt="SecureClaw — Clawing Back Control of LLM Agents" width="100%">
+</p>
 
-Research runtime accompanying **SecureClaw: Clawing Back Control of LLM Agents**, by Yuhan Ma and Stefan Schmid, accepted at NeurIPS 2026.
+<p align="center">
+  <a href="https://openreview.net/forum?id=0omFi3ZiBf"><img src="https://img.shields.io/badge/NeurIPS-2026-176B65?style=flat-square" alt="NeurIPS 2026"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Python-3.11%2B-345A78?style=flat-square" alt="Python 3.11+"></a>
+  <a href="https://github.com/ponyyuhan/SecureClaw_repo/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/Tests-GitHub_Actions-345A78?style=flat-square" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-176B65?style=flat-square" alt="MIT License"></a>
+</p>
 
-[Paper and discussion](https://openreview.net/forum?id=0omFi3ZiBf)
+<p align="center">
+  <a href="https://openreview.net/forum?id=0omFi3ZiBf"><b>Paper</b></a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="experiments/README.md">Experiments</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="#citation">Citation</a>
+</p>
 
-SecureClaw moves sensitive data access and action authorization into a mediated runtime. This reference implementation includes opaque handles, declassification, two policy servers, PREVIEW–COMMIT authorization, executor-side verification of both policy-server MACs, replay protection, and capsule mediation examples.
+**SecureClaw separates an agent's planning from its access to sensitive data and authority to act.** The agent works with short summaries and reference IDs; trusted runtime components retain protected values, check policy, and execute authorized requests.
 
-This repository includes the SecureClaw runtime, method adapters, experiment runners, scoring code, configurations, and local tests. The [experiment guide](experiments/README.md) explains how to retrieve the upstream benchmarks and baseline implementations and run the evaluations. Generated results, raw model traces, caches, and temporary development files are not bundled. See [the paper-to-code map](docs/paper_to_code.md) for the implementation and evaluation entry points.
+This is the code for **[SecureClaw: Clawing Back Control of LLM Agents](https://openreview.net/forum?id=0omFi3ZiBf)**, by **Yuhan Ma and Stefan Schmid**, accepted at **NeurIPS 2026**. It includes the runtime, method adapters, evaluation runners, scoring code, configurations, and tests.
 
 ## Quick start
 
-Use Python 3.11 or newer on macOS or Linux. The built-in demonstration and validation do not require an LLM or provider credentials.
+**Python 3.11+ · macOS or Linux · no API key needed for the local demo.**
 
 ```bash
 git clone https://github.com/ponyyuhan/SecureClaw_repo.git
@@ -19,89 +33,106 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 
+# Start two policy servers, the executor, and the gateway.
 bash scripts/dev_up.sh
 bash scripts/check_health.sh
+
+# Check the runtime and try benign and malicious agent actions.
 python scripts/validate_runtime.py
 python main.py agent-demo both
+
+# Stop the local services.
 bash scripts/dev_down.sh
 ```
 
-The local launcher builds policy databases and starts two policy servers, an executor, and an HTTP gateway. It writes process IDs, logs, and local databases under `.runtime/`. Stop the stack when finished. These commands use loopback ports 9001, 9002, 9100, and 8765; if they are occupied, set `P0_PORT`, `P1_PORT`, `EXECUTOR_PORT`, and `MIRAGE_HTTP_PORT` consistently in the invoking shell.
+The demo uses synthetic secrets and simulated message, fetch, and webhook sinks. It makes no hosted-model calls and sends no external messages. Logs and local state are written under `.runtime/`.
 
-The demo maps sensitive-looking file paths to explicit fake fixtures under `gateway/demo_data/`. Message, fetch, and webhook executor endpoints validate authorization and return simulated results; they do not send email or perform external network requests. The included fake secret strings are test data.
+See the **[setup guide](docs/quickstart.md)** for expected behavior, ports, troubleshooting, and platform-specific capsule checks.
 
-## Validation
+## How it works
 
-See [implementation checks](experiments/implementation_checks.md) for the repaired mechanisms and the distinction between channel-mediation and protected-read experiments.
+<p align="center">
+  <img src="docs/assets/secureclaw-workflow.png" alt="Three illustrated steps: read summaries and reference IDs, preview the proposed request against policy, and verify authorization before committing the action." width="100%">
+</p>
 
-Run the portable mechanism tests without starting services:
+1. **Read through the gateway.** Protected values stay in trusted storage. The agent receives reference IDs (opaque handles) and the permitted summary view.
+2. **Preview the proposed action.** Policy checks bind authorization to the canonical request and its execution context.
+3. **Commit the authorized request.** The executor verifies both policy-server MACs, request binding, freshness, and replay state before executing the action.
+
+The runtime also provides mediation for final output, inter-agent messages, persistent memory, and skill ingress. The **[paper-to-code map](docs/paper_to_code.md)** links each mechanism to its implementation and tests, including the distinction between the local demo's redacted previews and the benchmark adapters' schema-aware summaries. The illustration above is a conceptual overview; the source map describes the individual trusted components.
+
+## Experiments
+
+| Start here | What it covers |
+| --- | --- |
+| [Primary evaluations](experiments/README.md) | AgentDojo, Agent Security Bench (ASB), and AgentLeak; dependency retrieval, configurations, runners, and scoring |
+| [Additional evaluations](rebuttal/README.md) | Model transfer, adapted baselines, field classification, and accommodation experiments |
+| [Mechanism evaluations](experiments/mechanism_evaluations.md) | Authorization checks, summary diagnostics, recovery behavior, and timing |
+| [Implementation checks](experiments/implementation_checks.md) | Regression coverage and the scope of the different evaluation paths |
+
+Benchmark sources are retrieved at recorded revisions, with integration patches and third-party license notices included. Runs generate their own outputs; stored results, model transcripts, caches, and temporary engineering files are excluded. See the [release scope](docs/paper_to_code.md#results-and-reproducibility) for the source inventory and exclusions.
+
+## Tests
+
+Run the portable tests from the repository root:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The live local validation command in the quick start exercises handle binding, declassification, PREVIEW–COMMIT, authentication, delegation, revocation, memory, inter-agent messages, and skill ingress. It uses only the local demo services.
-
-Capsule checks additionally exercise operating-system mediation and require the corresponding platform facility:
+To include the AgentDojo/ASB method-adapter checks, install the optional test dependency in a **Python 3.11** environment, then rerun the suite:
 
 ```bash
-# macOS with sandbox-exec
-bash capsule/run_smoke.sh
-
-# Linux with bubblewrap installed
-bash capsule/run_smoke_linux.sh
+python -m pip install -r method_adapters/agentdojo/requirements.txt
+python -m unittest discover -s tests -v
 ```
 
-The macOS capsule check was validated with CPython 3.11.4 from an Anaconda installation. A Homebrew Python 3.14 virtual environment failed at interpreter launch under the OS sandbox on the preparation machine; use a compatible interpreter installation for capsule testing. This limitation does not affect the ordinary local runtime checks.
+The tests use synthetic inputs and do not call hosted models. Checks that need the optional adapter dependency are reported as skipped when it is absent. [GitHub Actions](.github/workflows/tests.yml) runs the offline suite on Linux and macOS, plus local runtime validation on Linux.
 
-These scripts create local test artifacts and a loopback test server. Their platform requirements and scope are described in [capsule/MC_CONTRACT_SPEC.md](capsule/MC_CONTRACT_SPEC.md). Running the ordinary HTTP/MCP demo alone does not establish that every agent side effect is confined by the capsule.
+## Agent integrations
 
-## Method implementation used by benchmark integrations
+The gateway supports **HTTP and MCP**. An [MCP configuration example](mcp_config.example.json) and optional **OpenClaw** and **NanoClaw / Claude Agent SDK** adapters are included.
 
-The [AgentDojo/ASB adapter](method_adapters/agentdojo/README.md) provides the existing `SecureClawToolsExecutor`, including the deterministic summary core, typed aliases, task checks, policy requests, and controlled tool execution. Its optional dependencies and deterministic configuration are documented separately.
+See **[agent integrations](docs/integrations.md)** for setup. MCP mediates the tools routed through SecureClaw; complete mediation also requires restricting the agent's other execution paths. OS capsule examples are provided separately for macOS and Linux.
 
-The [AgentLeak adapters](method_adapters/agentleak/README.md) provide field classification and masking, protected-value registration, the contextual classifier, and C1/C2/C5 mediation. The contextual classifier is a separate diagnostic component and requires an explicit model request; local tests make no model calls.
+## Repository guide
 
-The primary benchmark runners and their scoring paths are also included; see [primary evaluations](experiments/README.md), [additional experiments](rebuttal/README.md), and [mechanism evaluations](experiments/mechanism_evaluations.md). Required upstream revisions, local source patches, dependencies, and commands are documented. New runs generate their own result files. The standalone four-configuration Boundary/Handles experiment driver is not included in this release.
-
-## MCP and optional agent integrations
-
-Start the local services, then configure your MCP client with [mcp_config.example.json](mcp_config.example.json), replacing the repository path. The MCP server entry point is:
-
-```bash
-bash scripts/launch_mcp_gateway.sh
-```
-
-Keep the client's normal permission and sandbox settings. SecureClaw mediates actions routed through its gateway; attaching the MCP tool alone does not remove the client's other tools or establish complete mediation.
-
-Optional adapters are provided in `integrations/openclaw_plugin/` and `integrations/nanoclaw_runner/`. They require the respective client installation and, for model calls, the user's own provider credentials. They are separate from the local validation and may incur provider charges. Their compatibility with current client versions is not part of the local validation results.
-
-## Configuration and deployment scope
-
-The shipped policy and credentials are deliberately synthetic development defaults. `.env.example` documents the available settings. Shell launchers read exported environment variables; they do not automatically load `.env`.
-
-This is a research prototype. Keep the demo bound to loopback. A deployment with real data must supply private policy-server keys and gateway authentication, separate the non-colluding policy-server trust domains, replace the demo secret store and simulated sinks, and authenticate callers and user confirmations through trusted application code. The `caller` field and `user_confirm` boolean in demonstrations are not independent proof of identity or human approval.
-
-Existing ablation and insecure-demo switches are retained for research compatibility. The supplied launcher enables signed PIR, both policy-server MACs, and persistent executor replay state. Enabling an ablation or bypass option changes the claimed security configuration.
-
-## Repository layout
-
-| Path | Purpose |
+| Directory | Contents |
 | --- | --- |
-| `gateway/` | Intent routing, handles, declassification, policy client, and executors |
-| `policy_server/`, `fss/` | Python policy evaluation, DPF-based private lookup, policy database builder |
-| `executor_server/` | Independent authorization verification and simulated action sinks |
-| `capsule/`, `spec/` | OS capsule examples and existing mediation contracts |
-| `secureclaw/`, `common/` | Task capsules, canonical request binding, tokens, and shared utilities |
-| `agent/`, `integrations/` | Built-in synthetic agent and optional client adapters |
-| `method_adapters/` | Source adapters for summaries, classification, and benchmark-facing method integration |
-| `experiments/`, `scripts/` | Benchmark setup, primary evaluation runners, scoring, and mechanism experiments |
-| `rebuttal/experiments/` | Additional model-transfer, baseline, classification, and accommodation experiments |
-| `tests/`, `scripts/validate_runtime.py` | Portable tests and local integration validation |
-| `policy_server_rust/` | Optional Rust policy-server implementation; not required by quick start |
+| [`gateway/`](gateway/) | Handles, summaries, routing, policy client, and mediated operations |
+| [`policy_server/`](policy_server/) · [`fss/`](fss/) | Policy evaluation and DPF-based private lookup |
+| [`executor_server/`](executor_server/) | Request-bound authorization verification and simulated action sinks |
+| [`secureclaw/`](secureclaw/) · [`common/`](common/) | Task capsules, canonical requests, tokens, and shared utilities |
+| [`capsule/`](capsule/) · [`spec/`](spec/) | OS mediation examples and protocol specifications |
+| [`method_adapters/`](method_adapters/) | Benchmark-facing method implementations |
+| [`experiments/`](experiments/) · [`scripts/`](scripts/) · [`rebuttal/`](rebuttal/) | Evaluation setup, runners, and scoring |
+| [`agent/`](agent/) · [`integrations/`](integrations/) | Local agent demo and optional client adapters |
+| [`tests/`](tests/) | Offline regression tests |
 
-## Citation and licensing
+The optional [`policy_server_rust/`](policy_server_rust/) implementation is not required for the Python quick start.
 
-Please cite the paper using [CITATION.cff](CITATION.cff). The code was prepared from the authors' previously public runtime repository; provenance is recorded in [docs/release_notes.md](docs/release_notes.md).
+## Configuration
 
-The SecureClaw source in this release is available under the [MIT License](LICENSE), selected by the authors. Dependencies and referenced external projects retain their own licenses.
+Development settings are documented in [`.env.example`](.env.example). Shell launchers read exported environment variables; they do not load `.env` automatically. The defaults use loopback services, synthetic credentials, signed policy responses, and persistent executor replay state.
+
+For real-data deployments, configure private keys and authenticated callers, separate the policy-server trust domains, connect real action backends, and enforce the intended OS boundary. See **[configuration and deployment](docs/configuration.md)** for these assumptions and the existing research switches.
+
+## Citation
+
+```bibtex
+@inproceedings{ma2026secureclaw,
+  title     = {SecureClaw: Clawing Back Control of LLM Agents},
+  author    = {Ma, Yuhan and Schmid, Stefan},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2026},
+  url       = {https://openreview.net/forum?id=0omFi3ZiBf}
+}
+```
+
+Machine-readable metadata is available in [CITATION.cff](CITATION.cff).
+
+## Contributing and license
+
+Bug reports and focused contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development and testing instructions.
+
+SecureClaw is released under the **[MIT License](LICENSE)**. Third-party code retains its original licenses; see [attribution](experiments/THIRD_PARTY.md) and adapter notices. Source provenance and maintenance notes are recorded in [release notes](docs/release_notes.md).
