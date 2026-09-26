@@ -62,7 +62,7 @@ The [AgentDojo/ASB adapter](method_adapters/agentdojo/README.md) provides the ex
 
 The [AgentLeak adapters](method_adapters/agentleak/README.md) provide field classification and masking, protected-value registration, the contextual classifier, and C1/C2/C5 mediation. The contextual classifier is a separate diagnostic component and requires an explicit model request; local tests make no model calls.
 
-The original benchmark runners and their scoring paths are also included; see [primary evaluations](experiments/README.md), [additional experiments](rebuttal/README.md), and [mechanism evaluations](experiments/mechanism_evaluations.md). Required upstream revisions, local source patches, dependencies, and commands are documented. New runs generate their own result files.
+The primary benchmark runners and their scoring paths are also included; see [primary evaluations](experiments/README.md), [additional experiments](rebuttal/README.md), and [mechanism evaluations](experiments/mechanism_evaluations.md). Required upstream revisions, local source patches, dependencies, and commands are documented. New runs generate their own result files. The standalone four-configuration Boundary/Handles experiment driver is not included in this release.
 
 ## MCP and optional agent integrations
 

@@ -1,13 +1,13 @@
 # Mechanism evaluations
 
-The original mechanism-evaluation source is included alongside the benchmark runners. The scripts generate their own outputs; no historical results are required to inspect or rerun their logic.
+The mechanism-evaluation scripts listed below are included alongside the benchmark runners. They generate their own outputs; no historical results are required to inspect or rerun their logic. The standalone four-configuration Boundary/Handles experiment driver is not included in this release.
 
 | Evaluation | Source |
 | --- | --- |
 | Deterministic summary-pair diagnostic | `scripts/measure_summary_tv_distance.py` |
 | Request-authorization adversarial cases | `scripts/security_game_nbe_check.py` |
 | Payment example | `scripts/e3_payment_nbe_demo.py` |
-| Boundary/handle ablations | `scripts/run_pillar_ablation.py`, `scripts/paper_eval.py` |
+| Local policy-check diagnostic | `scripts/paper_eval.py` |
 | ASB denial-recovery ablation | `scripts/run_recovery_ablation.py` |
 | AgentLeak-style recovery and three-seed diagnostics | `scripts/additional_experiments_runner.py` |
 | Runtime/capsule checks and combined report | `scripts/artifact_report.py`, `scripts/compromised_bypass_report.py` |
@@ -15,7 +15,7 @@ The original mechanism-evaluation source is included alongside the benchmark run
 
 These are the existing evaluation implementations, with their original CLI or environment options. They include deliberate insecure ablation modes as experimental controls; leave the normal runtime configuration enabled outside those comparisons. Capsule-specific checks require their documented platform tools, and the Rust timing variant requires Cargo.
 
-`measure_summary_tv_distance.py` runs the independent deterministic-core paired diagnostic; it makes no model requests. It is separate from the current adapter's optional model-assisted summary mode. `run_recovery_ablation.py` invokes hosted inference when run and takes `RECOVERY_ABLATION_MODEL` and `RECOVERY_ABLATION_N_PER_ATTACK` from the environment. The benchmark-facing pillar ablations can also invoke hosted inference. The local payment demonstration uses simulated effects.
+`measure_summary_tv_distance.py` runs the independent deterministic-core paired diagnostic; it makes no model requests. It is separate from the current adapter's optional model-assisted summary mode. `run_recovery_ablation.py` invokes hosted inference when run and takes `RECOVERY_ABLATION_MODEL` and `RECOVERY_ABLATION_N_PER_ATTACK` from the environment. The local payment demonstration uses simulated effects.
 
 Consult each script's existing argument definitions before execution. Several original local diagnostics use `OUT_DIR` or `artifact_out/` rather than command-line output options. Run them in an isolated checkout when comparing variants, since some rebuild local policy databases. The public source includes these evaluation paths; the small release-validation run does not rerun every experiment.
 
@@ -47,15 +47,3 @@ reported as incomplete runs rather than counted as safe refusals. Successfully
 completed rows and error counts are retained in an `errors_*.json` output when
 this happens; the failed stage does not emit a security aggregate. This change
 fixes error reporting without changing scoring for valid model responses.
-
-## Matched channel ablation inventory
-
-The original matched channel ablation requests 50 generator scenarios, producing 48 valid scenarios (24 attacked and 24 benign):
-
-```bash
-python scripts/run_pillar_ablation.py --benchmarks agentleak \
-  --agentleak-n 50 --seed 42 --configs full,no_nbe,no_sm,no_both \
-  --model gpt-4o-mini-2024-07-18 --output-dir runs/pillar_ablation
-```
-
-The generator's rounding means its requested count and actual count can differ. Check the emitted denominators and actual plaintext/executor events for each arm. The default larger count is a different inventory.

@@ -28,6 +28,8 @@ The source of the paper's quantitative claims is the paper and its official auth
 
 The experiment runners, scoring code, configurations, and dependency retrieval instructions are included. Upstream benchmark and baseline code is retrieved at the recorded revisions and patched with the supplied integration changes. Original model traces, stored experiment outputs, private review material, and temporary working files are not bundled. In particular, `scripts/validate_runtime.py` has 50 local mechanism checks and is distinct from the paper's bypass suite. The filename `test_agentleak_channels.py` refers to channel mechanisms; these tests do not run the AgentLeak benchmark.
 
+The standalone four-configuration Boundary/Handles experiment driver is outside this release's scope. Its underlying runtime mechanisms and regression tests remain included.
+
 ## Method adapters
 
 | Paper component | Disclosed source | Local checks |

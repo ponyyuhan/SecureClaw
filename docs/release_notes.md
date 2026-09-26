@@ -59,3 +59,7 @@ The accommodation runner's existing protocol-document dependency is supplied at 
 ## Implementation verification repairs
 
 Expanded own-method checks identified and repaired per-read reference collisions, overwritten task records, incomplete sensitive-value registration, missing attack delivery in the topology adapter, and incomplete channel observation during ablations. Evaluation errors are reported separately from scored outcomes, field-diagnostic selection works without historical result files, and the confirmation test now exercises a genuinely confirmation-required action. Existing authorization, replay, confinement and confirmation protections remain enabled. See [implementation checks](../experiments/implementation_checks.md) for entry points and scope. No upstream benchmark data or scoring rule was changed.
+
+## Evaluation packaging scope
+
+The standalone four-configuration Boundary/Handles experiment driver and its command example have been removed from the current release tree. Core runtime mechanisms, regression tests, and the other documented evaluation entry points are unchanged. Experiment outputs remain outside the repository.
