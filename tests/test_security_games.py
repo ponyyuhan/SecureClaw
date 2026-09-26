@@ -361,6 +361,86 @@ class SecurityGameTests(unittest.TestCase):
         self.assertNotEqual(code, "OK")
 
 
+class LegacyEvidenceDowngradeTests(unittest.TestCase):
+    """Signed lookup responses must not substitute for request-bound commits."""
+
+    def setUp(self) -> None:
+        self.keys = {0: "11" * 32, 1: "22" * 32}
+        self.action_id = "legacy_evidence_reuse"
+        patcher = patch.multiple(
+            ex,
+            POLICY0_KEYS={"0": bytes.fromhex(self.keys[0])},
+            POLICY1_KEYS={"0": bytes.fromhex(self.keys[1])},
+            EXECUTOR_INSECURE_ALLOW=False,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _lookup_evidence(self, db: str, result: int) -> dict:
+        proofs = []
+        for server_id, share in ((0, result), (1, 0)):
+            proof = {
+                "v": 1,
+                "kind": "bit",
+                "server_id": server_id,
+                "kid": "0",
+                "ts": int(time.time()),
+                "action_id": self.action_id,
+                "db": db,
+                "resp_sha256": hashlib.sha256(bytes([share])).hexdigest(),
+            }
+            proof["mac_b64"] = _mac_b64(self.keys[server_id], proof)
+            proofs.append(proof)
+        evidence = {
+            "db": db,
+            "action_id": self.action_id,
+            "a0": [result],
+            "a1": [0],
+            "policy0": proofs[0],
+            "policy1": proofs[1],
+        }
+        # The old proofs are authentic; rejection must come from the missing
+        # request-bound authorization, not an invalid test signature.
+        shares, code = ex._verify_bit_batch_evidence(
+            evidence, action_id=self.action_id, logical_db=db, allowed_dbs=[db]
+        )
+        self.assertEqual((shares, code), ([result], "OK"))
+        return evidence
+
+    def test_signed_lookup_cannot_authorize_message_or_downgrade_partial_commit(self) -> None:
+        evidence = {
+            "allow_recipients": self._lookup_evidence("allow_recipients", 1),
+            "banned_tokens": self._lookup_evidence("banned_tokens", 0),
+        }
+        for commit in ({}, {"policy0": {"v": 1}}):
+            for recipient, text in (
+                ("alice@example.com", "hello"),
+                ("outsider@example.net", "changed payload"),
+            ):
+                with self.subTest(commit=commit, recipient=recipient):
+                    req = ex.ExecSendMessageReq(
+                        action_id=self.action_id,
+                        recipient=recipient,
+                        text=text,
+                        evidence=evidence,
+                        commit=commit,
+                    )
+                    self.assertEqual(ex.exec_send_message(req)["status"], "DENY")
+
+    def test_signed_lookup_cannot_authorize_fetch_or_downgrade_partial_commit(self) -> None:
+        evidence = {"allow_domains": self._lookup_evidence("allow_domains", 1)}
+        for commit in ({}, {"policy0": {"v": 1}}):
+            for domain in ("example.com", "outsider.example.net"):
+                with self.subTest(commit=commit, domain=domain):
+                    req = ex.ExecFetchReq(
+                        action_id=self.action_id,
+                        domain=domain,
+                        evidence=evidence,
+                        commit=commit,
+                    )
+                    self.assertEqual(ex.exec_fetch(req)["status"], "DENY")
+
+
 class DFAEvidenceTests(unittest.TestCase):
     @staticmethod
     def _mk_block(*, next_state: int, matched: bool, block_size: int = 4) -> bytes:

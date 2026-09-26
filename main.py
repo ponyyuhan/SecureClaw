@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -45,15 +46,15 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     if args.cmd == "build-dbs":
-        return _run(["python", "-m", "policy_server.build_dbs"])
+        return _run([sys.executable, "-m", "policy_server.build_dbs"])
     if args.cmd == "policy-server":
-        return _run(["python", "-m", "policy_server.server"])
+        return _run([sys.executable, "-m", "policy_server.server"])
     if args.cmd == "executor-server":
-        return _run(["python", "-m", "executor_server.server"])
+        return _run([sys.executable, "-m", "executor_server.server"])
     if args.cmd == "mcp-gateway":
-        return _run(["python", "-m", "gateway.mcp_server"])
+        return _run([sys.executable, "-m", "gateway.mcp_server"])
     if args.cmd == "http-gateway":
-        return _run(["python", "-m", "gateway.http_server"])
+        return _run([sys.executable, "-m", "gateway.http_server"])
     if args.cmd == "dev-up":
         return _run_script("dev_up.sh")
     if args.cmd == "dev-down":
@@ -61,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "health":
         return _run_script("check_health.sh")
     if args.cmd == "validate":
-        return _run(["python", "scripts/validate_runtime.py"])
+        return _run([sys.executable, "scripts/validate_runtime.py"])
     if args.cmd == "agent-demo":
         return _run_script("run_agent_demo.sh", [args.mode])
     if args.cmd == "nanoclaw":

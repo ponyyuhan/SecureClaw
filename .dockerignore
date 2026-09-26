@@ -1,5 +1,6 @@
 .git
 .venv
+.venv-experiments
 .env
 .env.*
 !.env.example
@@ -14,3 +15,6 @@ artifact_out*
 gateway/demo_data/workspace
 policy_server/data
 integrations/openclaw_workspace/.openclaw
+third_party
+runs
+results

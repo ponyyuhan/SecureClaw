@@ -597,7 +597,6 @@ def health():
 @app.post("/exec/send_message")
 def exec_send_message(req: ExecSendMessageReq):
     action_id = req.action_id
-    ev = req.evidence or {}
 
     if EXECUTOR_INSECURE_ALLOW:
         # Baseline / ablation: executor that does not enforce dual authorization.
@@ -652,46 +651,14 @@ def exec_send_message(req: ExecSendMessageReq):
             "data": {"recipient": req.recipient, "sent_chars": len(out_text), "commit_tag_b64": base64.b64encode(tag or b"").decode("ascii")},
         }
 
-    # Recipient allowlist must be proven by both servers.
-    recon, code = _verify_bit_batch_evidence(
-        ev.get("allow_recipients") or {},
-        action_id=action_id,
-        logical_db="allow_recipients",
-        allowed_dbs=["allow_recipients", os.getenv("POLICY_BUNDLE_DB", "policy_bundle")],
-    )
-    if recon is None or not recon or recon[0] != 1:
-        return {"status": "DENY", "reason_code": "RECIPIENT_NOT_ALLOWED", "details": code}
-
-    # DLP checks
-    dlp_mode = (req.dlp_mode or "fourgram").strip().lower()
-    hits, code2 = _verify_bit_batch_evidence(
-        ev.get("banned_tokens") or {},
-        action_id=action_id,
-        logical_db="banned_tokens",
-        allowed_dbs=["banned_tokens", os.getenv("POLICY_BUNDLE_DB", "policy_bundle")],
-    )
-    if hits is None:
-        return {"status": "DENY", "reason_code": "MISSING_DLP_PROOF", "details": code2}
-
-    has_hit = any(int(h) == 1 for h in hits)
-    if not has_hit:
-        return {"status": "OK", "reason_code": "ALLOW"}
-
-    if dlp_mode != "dfa":
-        return {"status": "DENY", "reason_code": "DLP_BLOCKED"}
-
-    matched, code3 = _verify_dfa_evidence(ev.get("dfa") or {}, text=req.text, action_id=action_id)
-    if matched is None:
-        return {"status": "DENY", "reason_code": "BAD_DFA_PROOF", "details": code3}
-    if matched:
-        return {"status": "DENY", "reason_code": "DLP_BLOCKED"}
-    return {"status": "OK", "reason_code": "ALLOW"}
+    # Lookup proofs authenticate query results, not this request's recipient,
+    # content, or context. They cannot replace request-bound commit proofs.
+    return {"status": "DENY", "reason_code": "BAD_COMMIT_PROOF", "details": "missing_commit"}
 
 
 @app.post("/exec/fetch")
 def exec_fetch(req: ExecFetchReq):
     action_id = req.action_id
-    ev = req.evidence or {}
 
     if EXECUTOR_INSECURE_ALLOW:
         return {"status": "OK", "reason_code": "ALLOW_INSECURE", "data": {"resource_id": req.resource_id, "domain": req.domain, "content_preview": "<html>...</html>"}}
@@ -730,21 +697,8 @@ def exec_fetch(req: ExecFetchReq):
             "data": {"resource_id": req.resource_id, "domain": req.domain, "content_preview": "<html>...</html>", "commit_tag_b64": base64.b64encode(tag or b"").decode("ascii")},
         }
 
-    recon, code = _verify_bit_batch_evidence(
-        ev.get("allow_domains") or {},
-        action_id=action_id,
-        logical_db="allow_domains",
-        allowed_dbs=["allow_domains", os.getenv("POLICY_BUNDLE_DB", "policy_bundle")],
-    )
-    if recon is None or not recon or recon[0] != 1:
-        return {"status": "DENY", "reason_code": "DOMAIN_NOT_ALLOWED", "details": code}
-
-    # Offline demo: return a canned response.
-    return {
-        "status": "OK",
-        "reason_code": "ALLOW",
-        "data": {"resource_id": req.resource_id, "domain": req.domain, "content_preview": "<html>...</html>"},
-    }
+    # A signed allowlist lookup alone is not bound to the requested domain.
+    return {"status": "DENY", "reason_code": "BAD_COMMIT_PROOF", "details": "missing_commit"}
 
 
 @app.post("/exec/webhook")
