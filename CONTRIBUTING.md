@@ -4,7 +4,7 @@ Focused bug reports, documentation improvements, and implementation fixes are we
 
 ## Report a problem
 
-Open a [GitHub issue](https://github.com/ponyyuhan/SecureClaw_repo/issues) with the command you ran, the expected and actual behavior, and your OS and Python version. A small example using synthetic inputs is especially useful. Remove credentials, real protected values, and private model transcripts before posting logs.
+Open a [GitHub issue](https://github.com/ponyyuhan/SecureClaw/issues) with the command you ran, the expected and actual behavior, and your OS and Python version. A small example using synthetic inputs is especially useful. Remove credentials, real protected values, and private model transcripts before posting logs.
 
 For a vulnerability involving real data or deployed credentials, contact the authors using the contact information in the [paper](https://openreview.net/forum?id=0omFi3ZiBf) instead of posting sensitive details publicly.
 

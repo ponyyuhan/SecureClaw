@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://openreview.net/forum?id=0omFi3ZiBf"><img src="https://img.shields.io/badge/NeurIPS-2026-176B65?style=flat-square" alt="NeurIPS 2026"></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/Python-3.11%2B-345A78?style=flat-square" alt="Python 3.11+"></a>
-  <a href="https://github.com/ponyyuhan/SecureClaw_repo/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/Tests-GitHub_Actions-345A78?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/ponyyuhan/SecureClaw/actions/workflows/tests.yml"><img src="https://img.shields.io/badge/Tests-GitHub_Actions-345A78?style=flat-square" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-176B65?style=flat-square" alt="MIT License"></a>
 </p>
 
@@ -27,8 +27,8 @@ This is the code for **[SecureClaw: Clawing Back Control of LLM Agents](https://
 **Python 3.11+ · macOS or Linux · no API key needed for the local demo.**
 
 ```bash
-git clone https://github.com/ponyyuhan/SecureClaw_repo.git
-cd SecureClaw_repo
+git clone https://github.com/ponyyuhan/SecureClaw.git
+cd SecureClaw
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt

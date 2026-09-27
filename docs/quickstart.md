@@ -7,8 +7,8 @@
 Use Python 3.11 or newer on macOS or Linux. Python 3.11 is also the recommended environment for the optional benchmark dependencies.
 
 ```bash
-git clone https://github.com/ponyyuhan/SecureClaw_repo.git
-cd SecureClaw_repo
+git clone https://github.com/ponyyuhan/SecureClaw.git
+cd SecureClaw
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
